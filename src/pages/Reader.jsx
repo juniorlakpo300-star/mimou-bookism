@@ -1,30 +1,30 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
+import { useAuth } from '../AuthContext.jsx'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 
 export default function Reader() {
   const { id } = useParams()
+  const { user } = useAuth()
   const [book, setBook] = useState(null)
   const [comments, setComments] = useState([])
   const [comment, setComment] = useState('')
-  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     async function load() {
-      const [{ data: bookData, error: bookError }, { data: commentData }] = await Promise.all([
+      const [{ data: bookData, error: bookError }, { data: commentData, error: commentError }] = await Promise.all([
         supabase.from('books').select('*').eq('id', id).single(),
         supabase.from('comments').select('*').eq('book_id', id).order('created_at', { ascending: false })
       ])
       if (bookError) setError(bookError.message)
       else setBook(bookData)
+      if (commentError) console.error(commentError)
       setComments(commentData || [])
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user?.email) setEmail(user.email)
       setLoading(false)
     }
     load()
@@ -32,13 +32,17 @@ export default function Reader() {
 
   async function addComment(event) {
     event.preventDefault()
-    if (!comment.trim() || !email.trim()) return
+    if (!user) return
+    const content = comment.trim()
+    if (!content) return
     setSending(true)
+
     const { data, error: insertError } = await supabase.from('comments').insert({
       book_id: id,
-      user_email: email.trim(),
-      content: comment.trim()
+      user_email: user.email,
+      content
     }).select().single()
+
     if (insertError) alert(`Erreur : ${insertError.message}`)
     else {
       setComments(prev => [data, ...prev])
@@ -58,9 +62,12 @@ export default function Reader() {
       <div className="reader-card">
         <Link to="/catalogue" className="btn">← Catalogue</Link>
         <h1>{book.title}</h1>
-        <p className="reader-author">{book.author || 'Auteur inconnu'} {book.category ? `• ${book.category}` : ''}</p>
+        <p className="reader-author">
+          {book.author || 'Auteur inconnu'} {book.category ? `• ${book.category}` : ''}
+          {book.is_free ? ' • Gratuit' : book.price ? ` • ${book.price}` : ''}
+        </p>
 
-        <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} />
+        <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
         {book.description && <p className="reader-description">{book.description}</p>}
 
         <div className="reader-actions">
@@ -74,11 +81,16 @@ export default function Reader() {
 
         <section className="comments">
           <h2>Commentaires</h2>
-          <form onSubmit={addComment} className="comment-form">
-            <input value={email} onChange={e => setEmail(e.target.value)} type="email" placeholder="Ton e-mail" required />
-            <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Écris un commentaire..." rows="3" required />
-            <button className="btn primary" disabled={sending}>{sending ? 'Envoi...' : 'Commenter'}</button>
-          </form>
+          {user ? (
+            <form onSubmit={addComment} className="comment-form">
+              <p className="muted">Connecté en tant que <strong>{user.email}</strong></p>
+              <textarea value={comment} onChange={e => setComment(e.target.value)} placeholder="Écris un commentaire..." rows="3" required />
+              <button className="btn primary" disabled={sending}>{sending ? 'Envoi...' : 'Commenter'}</button>
+            </form>
+          ) : (
+            <p className="muted">Tu dois être connecté pour commenter. <Link to="/connexion">Se connecter</Link></p>
+          )}
+
           <div className="comment-list">
             {comments.length === 0 ? <p className="muted">Aucun commentaire pour le moment.</p> : comments.map(item => (
               <article className="comment" key={item.id}>
