@@ -1,13 +1,20 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase.js'
+import { useAuth } from '../AuthContext.jsx'
 
 export default function Publier() {
+  const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
+  useEffect(() => {
+    if (!authLoading && !user) navigate('/connexion', { replace: true })
+  }, [user, authLoading, navigate])
+
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!user) return
     setLoading(true)
     try {
       const form = event.currentTarget
@@ -22,6 +29,7 @@ export default function Publier() {
 
       if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
       if (pdf.type !== 'application/pdf') throw new Error('Le livre doit être un fichier PDF.')
+      if (!isFree && price <= 0) throw new Error('Indique un prix supérieur à 0 ou coche Livre gratuit.')
 
       const id = crypto.randomUUID()
       const coverExt = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -61,12 +69,15 @@ export default function Publier() {
     }
   }
 
+  if (authLoading) return <div className="state">Vérification du compte...</div>
+  if (!user) return null
+
   return (
     <main className="form-page">
       <div className="form-card wide">
         <Link to="/catalogue" className="btn">← Retour au catalogue</Link>
         <h1>Publier un livre</h1>
-        <p className="form-intro">Ajoute les informations du livre, sa couverture et son PDF.</p>
+        <p className="form-intro">Connecté en tant que <strong>{user.email}</strong>.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-row">
