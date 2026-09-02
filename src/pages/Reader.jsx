@@ -1,25 +1,18 @@
-import { useParams } from "react-router-dom"
-import { useEffect, useState } from "react"
-import { supabase } from "../supabase.js"
+import { useEffect, useState } from 'react'
+import { useParams } from 'react-router-dom'
+import { supabase } from '../supabase.js'
 
-export default function Reader(){
-  const { id } = useParams()
+export default function Lecteur(){
+  const {id} = useParams()
   const [book, setBook] = useState(null)
-
   useEffect(()=>{
-    async function getBook(){
-      const { data } = await supabase.from("books").select("*").eq("id", id).single()
-      setBook(data)
-    }
-    getBook()
+    supabase.from('books').select('*').eq('id',id).single().then(({data})=>setBook(data))
   },[id])
-
-  if(!book) return <div className="p-10">Chargement...</div>
-
+  if(!book) return <p>Chargement...</p>
   return(
-    <div className="p-6 max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4">{book.title} - {book.author}</h1>
-      <iframe src={book.book_url} className="w-full h-[80vh] rounded-xl bg-white" />
+    <div style={{padding:20}}>
+      <h2>{book.title}</h2>
+      <iframe src={book.file_url} style={{width:'100%', height:'90vh'}} title="pdf" />
     </div>
   )
 }
