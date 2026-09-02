@@ -1,18 +1,26 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import Publier from './pages/Publier'
 import Catalogue from './pages/Catalogue'
-import Lecteur from './pages/Lecteur'
+import Publier from './pages/Publier'
+import Reader from './pages/Reader'
 
-function App(){
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Catalogue />} />
         <Route path="/catalogue" element={<Catalogue />} />
         <Route path="/publier" element={<Publier />} />
-        <Route path="/lire/:id" element={<Lecteur />} />
+        <Route path="/lire/:id" element={<Reader />} />
+        <Route path="/read/:id" element={<Reader />} />
+        <Route
+          path="*"
+          element={
+            <div style={{ padding: 50 }}>
+              <h1>404 - Page non trouvée</h1>
+            </div>
+          }
+        />
       </Routes>
     </BrowserRouter>
   )
 }
-export default App
