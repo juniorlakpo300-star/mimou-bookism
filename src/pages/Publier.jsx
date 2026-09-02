@@ -1,51 +1,75 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 
-export default function Publier(){
+export default function Publier() {
   const [loading, setLoading] = useState(false)
 
-  async function handleSubmit(e){
-    e.preventDefault()
+  async function handleSubmit(event) {
+    event.preventDefault()
     setLoading(true)
-    try{
-      const form = e.target
-      const title = form.title.value
-      const file = form.cover.files[0]
 
-      if(!file) throw new Error("Choisis une image")
+    try {
+      const form = event.currentTarget
+      const title = form.title.value.trim()
+      const cover = form.cover.files[0]
 
-      const fileName = Date.now() + "_" + file.name.replace(/\s/g, "")
+      if (!cover) throw new Error('Choisis une image de couverture.')
 
-      // Upload cover
-      const { error: uploadError } = await supabase.storage.from('covers').upload(fileName, file)
-      if(uploadError) throw uploadError
+      const extension = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileName = `${Date.now()}-${crypto.randomUUID()}.${extension}`
 
-      const { data: urlData } = supabase.storage.from('covers').getPublicUrl(fileName)
+      const { error: uploadError } = await supabase.storage
+        .from('covers')
+        .upload(fileName, cover, { upsert: false })
 
-      // Insert book
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('covers')
+        .getPublicUrl(fileName)
+
       const { error: insertError } = await supabase.from('books').insert({
-        title: title,
-        author: "Mimou",
-        cover_url: urlData.publicUrl
+        title,
+        author: 'Mimou',
+        cover_url: urlData.publicUrl,
       })
-      if(insertError) throw insertError
 
-      alert("✅ Livre publié!")
+      if (insertError) throw insertError
+
+      alert('✅ Livre publié !')
       form.reset()
-    } catch(err){
+    } catch (err) {
       console.error(err)
-      alert("Erreur: " + err.message)
+      alert(`Erreur : ${err.message || 'Une erreur est survenue.'}`)
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{padding:50, maxWidth:400}}>
-      <h1>Publier un livre</h1>
-      <input name="title" placeholder="Titre" required style={{width:'100%', padding:10, marginBottom:10}} />
-      <input name="cover" type="file" accept="image/*" required style={{marginBottom:20}} />
-      <button disabled={loading} style={{padding:'10px 20px'}}>{loading? "Publication..." : "Publier"}</button>
-    </form>
+    <main className="form-page">
+      <div className="form-card">
+        <Link to="/catalogue" className="btn">← Retour au catalogue</Link>
+
+        <h1>Publier un livre</h1>
+
+        <form onSubmit={handleSubmit}>
+          <label className="field">
+            <span>Titre du livre</span>
+            <input name="title" placeholder="Ex. Les chemins de la réussite" required />
+          </label>
+
+          <label className="field">
+            <span>Couverture</span>
+            <input name="cover" type="file" accept="image/*" required />
+          </label>
+
+          <button className="btn primary" type="submit" disabled={loading}>
+            {loading ? 'Publication en cours...' : 'Publier le livre'}
+          </button>
+        </form>
+      </div>
+    </main>
   )
 }
