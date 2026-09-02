@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabase.js'
+import { useAuth } from '../AuthContext.jsx'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 
 export default function Catalogue() {
+  const { user, signOut } = useAuth()
   const [books, setBooks] = useState([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Toutes')
@@ -26,11 +28,14 @@ export default function Catalogue() {
   const filteredBooks = useMemo(() => {
     const q = search.trim().toLowerCase()
     return books.filter(book => {
-      const matchesSearch = !q || [book.title, book.author, book.description, book.category].filter(Boolean).join(' ').toLowerCase().includes(q)
-      const matchesCategory = category === 'Toutes' || book.category === category
-      return matchesSearch && matchesCategory
+      const text = [book.title, book.author, book.description, book.category].filter(Boolean).join(' ').toLowerCase()
+      return (!q || text.includes(q)) && (category === 'Toutes' || book.category === category)
     })
   }, [books, search, category])
+
+  async function handleLogout() {
+    await signOut()
+  }
 
   if (loading) return <div className="state">Chargement des livres...</div>
   if (error) return <div className="state error">Erreur : {error}</div>
@@ -42,8 +47,18 @@ export default function Catalogue() {
           <Link to="/" className="brand">MIMOU <span>BOOKISM</span></Link>
           <nav className="nav">
             <Link to="/catalogue" className="btn">Catalogue</Link>
-            <Link to="/connexion" className="btn">Connexion</Link>
-            <Link to="/publier" className="btn primary">+ Publier</Link>
+            {user ? (
+              <>
+                <span className="user-chip">👤 {user.email}</span>
+                <button onClick={handleLogout} className="btn">Déconnexion</button>
+                <Link to="/publier" className="btn primary">+ Publier</Link>
+              </>
+            ) : (
+              <>
+                <Link to="/connexion" className="btn">Connexion</Link>
+                <Link to="/inscription" className="btn">Créer un compte</Link>
+              </>
+            )}
           </nav>
         </header>
 
