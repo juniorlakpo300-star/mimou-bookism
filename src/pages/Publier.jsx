@@ -3,6 +3,66 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 import { useAuth } from '../AuthContext.jsx'
 
+const LITERARY_CATEGORIES = [
+  'Roman',
+  'Nouvelle',
+  'Poésie',
+  'Théâtre',
+  'Conte',
+  'Fable',
+  'Mémoires',
+  'Autobiographie',
+  'Biographie',
+  'Essai',
+  'Chronique',
+  'Correspondance',
+  'Journal intime',
+  'Littérature jeunesse',
+  'Littérature pour adolescents',
+  'Littérature africaine',
+  'Littérature francophone',
+  'Littérature étrangère',
+  'Roman historique',
+  'Roman policier',
+  'Roman d’aventure',
+  'Roman fantastique',
+  'Roman de science-fiction',
+  'Roman de fantasy',
+  'Roman romantique',
+  'Roman psychologique',
+  'Roman philosophique',
+  'Roman social',
+  'Roman épistolaire',
+  'Roman initiatique',
+  'Roman autobiographique',
+  'Dystopie',
+  'Utopie',
+  'Thriller',
+  'Horreur',
+  'Mystère',
+  'Aventure',
+  'Comédie',
+  'Tragédie',
+  'Drame',
+  'Satire',
+  'Épopée',
+  'Légende',
+  'Mythe',
+  'Spiritualité',
+  'Philosophie',
+  'Développement personnel',
+  'Éducation',
+  'Histoire',
+  'Société',
+  'Politique',
+  'Économie',
+  'Sciences',
+  'Art et culture',
+  'Religion',
+  'Jeunesse',
+  'Autre'
+]
+
 export default function Publier() {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
@@ -20,7 +80,7 @@ export default function Publier() {
       const form = event.currentTarget
       const title = form.title.value.trim()
       const author = form.author.value.trim() || 'Auteur inconnu'
-      const category = form.category.value.trim()
+      const category = form.category.value
       const description = form.description.value.trim()
       const price = Number(form.price.value || 0)
       const isFree = form.is_free.checked
@@ -90,7 +150,15 @@ export default function Publier() {
             <label className="field"><span>Auteur</span><input name="author" placeholder="Nom de l'auteur" /></label>
           </div>
           <div className="form-row">
-            <label className="field"><span>Catégorie</span><input name="category" placeholder="Roman, Éducation, etc." /></label>
+            <label className="field">
+              <span>Catégorie *</span>
+              <select name="category" defaultValue="" required>
+                <option value="" disabled>Choisir un genre littéraire</option>
+                {LITERARY_CATEGORIES.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </label>
             <label className="field"><span>Prix</span><input name="price" type="number" min="0" step="0.01" defaultValue="0" /></label>
           </div>
           <label className="field"><span>Description</span><textarea name="description" rows="4" placeholder="Présente brièvement le livre..." /></label>
