@@ -9,6 +9,7 @@ import Manga from './pages/Manga'
 import Favoris from './pages/Favoris'
 import Decouvrir from './pages/Decouvrir'
 import Ameliorations from './pages/Ameliorations'
+import Dictionnaire from './pages/Dictionnaire'
 import Publier from './pages/Publier'
 import Reader from './pages/Reader'
 import Ecrivain from './pages/Ecrivain'
@@ -30,6 +31,7 @@ export default function App() {
           <Route path="/favoris" element={<Favoris />} />
           <Route path="/decouvrir" element={<Decouvrir />} />
           <Route path="/ameliorations" element={<Ameliorations />} />
+          <Route path="/dictionnaire" element={<Dictionnaire />} />
           <Route path="/publier" element={<Publier />} />
           <Route path="/ecrivain" element={<Ecrivain />} />
           <Route path="/admin" element={<Admin />} />
