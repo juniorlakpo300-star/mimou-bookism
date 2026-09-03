@@ -3,6 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
+const FAVORITES_KEY = 'mimou_bookism_favorites'
+const LAST_READ_KEY = 'mimou_bookism_last_read'
+
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
+}
 
 export default function Catalogue() {
   const [searchParams] = useSearchParams()
@@ -10,6 +16,7 @@ export default function Catalogue() {
   const [search, setSearch] = useState('')
   const [type, setType] = useState('Tous')
   const [category, setCategory] = useState('Toutes')
+  const [favorites, setFavorites] = useState(getFavorites)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -53,6 +60,16 @@ export default function Catalogue() {
     })
   }, [books, search, type, category])
 
+  function toggleFavorite(id) {
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]
+    setFavorites(next)
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
+  }
+
+  function rememberRead(book) {
+    localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: book.id, title: book.title, cover_url: book.cover_url, at: Date.now() }))
+  }
+
   if (loading) return <div className="state books-theme">Chargement de la bibliothèque...</div>
   if (error) return <div className="state error books-theme">Erreur : {error}</div>
 
@@ -64,6 +81,7 @@ export default function Catalogue() {
           <nav className="nav">
             <Link to="/livres" className="btn active">📚 Livres</Link>
             <Link to="/mangas" className="btn">🗯️ Mangas</Link>
+            <Link to="/favoris" className="btn">❤️ Ma bibliothèque</Link>
             <Link to="/admin" className="btn">🛠️ Administration</Link>
           </nav>
         </header>
@@ -109,18 +127,23 @@ export default function Catalogue() {
         ) : (
           <section className="book-grid">
             {filteredBooks.map(book => (
-              <Link key={book.id} to={`/read/${book.id}`} className="book-card">
-                <div className="cover-wrap">
-                  <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title || 'livre'}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
-                  <span className={`book-status ${book.is_free ? 'free' : 'premium'}`}>{book.is_free ? 'Gratuit' : 'Premium'}</span>
-                </div>
-                <div className="book-info">
-                  <span className="badge">📚 LIVRE</span>
-                  <h2 className="book-title">{book.title || 'Sans titre'}</h2>
-                  <p className="book-author">{book.author || 'Auteur inconnu'}</p>
-                  {book.category && <span className="badge">{displayCategory(book)}</span>}
-                </div>
-              </Link>
+              <article key={book.id} className="book-card enhanced-book-card">
+                <Link to={`/read/${book.id}`} className="book-card-link" onClick={() => rememberRead(book)}>
+                  <div className="cover-wrap">
+                    <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title || 'livre'}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+                    <span className={`book-status ${book.is_free ? 'free' : 'premium'}`}>{book.is_free ? 'Gratuit' : 'Premium'}</span>
+                  </div>
+                  <div className="book-info">
+                    <span className="badge">📚 LIVRE</span>
+                    <h2 className="book-title">{book.title || 'Sans titre'}</h2>
+                    <p className="book-author">{book.author || 'Auteur inconnu'}</p>
+                    {book.category && <span className="badge">{displayCategory(book)}</span>}
+                  </div>
+                </Link>
+                <button type="button" className={`favorite-btn ${favorites.includes(book.id) ? 'is-favorite' : ''}`} onClick={() => toggleFavorite(book.id)} aria-label={favorites.includes(book.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
+                  {favorites.includes(book.id) ? '❤️' : '♡'} {favorites.includes(book.id) ? 'Favori' : 'Ajouter'}
+                </button>
+              </article>
             ))}
           </section>
         )}
