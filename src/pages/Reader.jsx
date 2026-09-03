@@ -9,11 +9,13 @@ const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
+const REWARDS_KEY = 'mimou_bookism_rewards'
 const BOOK_FIELDS = 'id,title,author,category,description,cover_url,file_path,file_url,book_url,is_free,price,views_count'
 
 function getFavorites() { try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] } }
 function getBookmarks() { try { return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || '{}') } catch { return {} } }
 function getProgress() { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') } catch { return {} } }
+function getRewards() { try { return JSON.parse(localStorage.getItem(REWARDS_KEY) || '{}') } catch { return {} } }
 
 export default function Reader() {
   const { id } = useParams()
@@ -32,24 +34,20 @@ export default function Reader() {
   const [pdfUrl, setPdfUrl] = useState('')
   const [sending, setSending] = useState(false)
   const [ratingSending, setRatingSending] = useState(false)
+  const [rewardNotice, setRewardNotice] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    setProgress(Number(getProgress()[id] || 0))
-  }, [id])
+  useEffect(() => { setProgress(Number(getProgress()[id] || 0)) }, [id])
 
   useEffect(() => {
     let active = true
-
     async function load() {
       const [{ data: bookData, error: bookError }, { data: commentData, error: commentError }, { data: ratingData, error: ratingError }] = await Promise.all([
         supabase.from('books').select(BOOK_FIELDS).eq('id', id).single(),
         supabase.from('comments').select('id,book_id,user_email,content,created_at').eq('book_id', id).order('created_at', { ascending: false }),
         supabase.from('book_ratings').select('rating').eq('book_id', id)
       ])
-
       if (!active) return
-
       if (bookError) setError(bookError.message)
       else {
         setBook(bookData)
@@ -58,14 +56,18 @@ export default function Reader() {
         localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: bookData.id, title: bookData.title, cover_url: bookData.cover_url, progress: Number(getProgress()[id] || 0), at: Date.now() }))
         const readCount = Number(localStorage.getItem('mimou_bookism_read_count') || 0) + 1
         localStorage.setItem('mimou_bookism_read_count', String(readCount))
+        const rewards = getRewards()
+        const previousReads = Number(rewards.reads || 0)
+        rewards.reads = Math.max(previousReads, readCount)
+        if (readCount === 1 && !rewards.firstRead) { rewards.firstRead = true; setRewardNotice('🏆 Badge débloqué : Premier chapitre !') }
+        if (readCount >= 5 && !rewards.fiveReads) { rewards.fiveReads = true; setRewardNotice('📚 Badge débloqué : Bibliophile !') }
+        localStorage.setItem(REWARDS_KEY, JSON.stringify(rewards))
         supabase.rpc('increment_book_views', { book_uuid: bookData.id }).then(({ error: viewError }) => { if (viewError) console.warn('Views:', viewError) })
         const filePath = bookData?.file_path || `${bookData?.id || id}.pdf`
         const { data: signedData, error: signedError } = await supabase.storage.from('books').createSignedUrl(filePath, 60 * 60)
         if (!signedError && signedData?.signedUrl) setPdfUrl(signedData.signedUrl)
         else if (bookData?.file_url || bookData?.book_url) setPdfUrl(bookData.file_url || bookData.book_url)
-        else if (signedError) console.error('PDF:', signedError)
       }
-
       if (commentError) console.error(commentError)
       setComments(commentData || [])
       if (!ratingError) {
@@ -75,7 +77,6 @@ export default function Reader() {
       }
       setLoading(false)
     }
-
     load()
     return () => { active = false }
   }, [id])
@@ -104,15 +105,39 @@ export default function Reader() {
 
   function saveProgress(value) {
     const cleanValue = Math.max(0, Math.min(100, Number(value)))
+    const previous = progress
     setProgress(cleanValue)
-    const next = getProgress()
-    next[id] = cleanValue
+    const next = getProgress(); next[id] = cleanValue
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(next))
     localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: book?.id || id, title: book?.title || '', cover_url: book?.cover_url || '', progress: cleanValue, at: Date.now() }))
+    if (cleanValue >= 100 && previous < 100) {
+      const rewards = getRewards(); rewards.completed = Number(rewards.completed || 0) + 1
+      if (!rewards.firstComplete) { rewards.firstComplete = true; setRewardNotice('🏁 Badge débloqué : Lecture terminée !') }
+      localStorage.setItem(REWARDS_KEY, JSON.stringify(rewards))
+    }
   }
 
-  function toggleFavorite() { const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]; setFavorites(next); localStorage.setItem(FAVORITES_KEY, JSON.stringify(next)) }
-  function toggleBookmark() { const next = { ...bookmarks }; if (next[id]) delete next[id]; else next[id] = { id, title: book.title, cover_url: book.cover_url, savedAt: Date.now() }; setBookmarks(next); localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next)) }
+  function toggleFavorite() {
+    const adding = !favorites.includes(id)
+    const next = adding ? [...favorites, id] : favorites.filter(item => item !== id)
+    setFavorites(next); localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
+    if (adding) {
+      const rewards = getRewards(); rewards.favorites = next.length
+      if (next.length >= 5 && !rewards.fiveFavorites) { rewards.fiveFavorites = true; setRewardNotice('❤️ Badge débloqué : Collectionneur !') }
+      if (next.length >= 10 && !rewards.tenFavorites) { rewards.tenFavorites = true; setRewardNotice('💎 Badge débloqué : Grand collectionneur !') }
+      localStorage.setItem(REWARDS_KEY, JSON.stringify(rewards))
+    }
+  }
+
+  function toggleBookmark() {
+    const next = { ...bookmarks }
+    if (next[id]) delete next[id]
+    else next[id] = { id, title: book.title, cover_url: book.cover_url, savedAt: Date.now(), progress }
+    setBookmarks(next); localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next))
+    if (!next[id]) setRewardNotice('🔖 Marque-page retiré.')
+    else setRewardNotice('🔖 Marque-page enregistré !')
+  }
+
   function toggleReadingMode() { const next = !readingMode; setReadingMode(next); localStorage.setItem('mimou_bookism_reading_mode', next ? '1' : '0') }
 
   if (loading) return <div className="state">Chargement...</div>
@@ -130,6 +155,7 @@ export default function Reader() {
     <main className={`reader ${theme} ${readingMode ? 'reading-mode-active' : ''}`}>
       <div className="reader-card">
         <Link to={backPath} className="btn">← {isManga ? 'Mangathèque' : 'Bibliothèque'}</Link>
+        {rewardNotice && <div className="reward-toast" role="status">{rewardNotice}<button type="button" onClick={() => setRewardNotice('')} aria-label="Fermer">×</button></div>}
         <h1>{book.title}</h1>
         <p className="reader-author">{book.author || (isManga ? 'Mangaka inconnu' : 'Auteur inconnu')} {book.category ? `• ${book.category}` : ''} • {book.is_free ? 'Gratuit' : 'Premium'}</p>
         <div className="reader-meta-strip"><span>👁️ {Number(book.views_count || 0) + 1} lecture(s)</span><span>⭐ {averageRating ? averageRating.toFixed(1) : '—'} / 5 ({ratingCount})</span><span>📖 {progress}% lu</span></div>
@@ -140,7 +166,7 @@ export default function Reader() {
           <div className="reading-progress-heading"><strong>📖 Ma progression</strong><span>{progress}%</span></div>
           <div className="reading-progress-track" aria-hidden="true"><div className="reading-progress-fill" style={{ width: `${progress}%` }} /></div>
           <input type="range" min="0" max="100" step="5" value={progress} onChange={e => saveProgress(e.target.value)} aria-label="Progression de lecture" />
-          <small>Déplace le curseur pour enregistrer ta progression. Elle restera enregistrée sur cet appareil.</small>
+          <small>Ta progression est enregistrée sur cet appareil.</small>
         </section>
         <div className="reader-actions">
           <button type="button" className={`btn ${isFavorite ? 'favorite-reading' : ''}`} onClick={toggleFavorite}>{isFavorite ? '❤️ Dans ma bibliothèque' : '♡ Ajouter à ma bibliothèque'}</button>
