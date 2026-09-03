@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 
@@ -12,6 +12,8 @@ export default function Admin() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(null)
+  const [search, setSearch] = useState('')
+  const [category, setCategory] = useState('Toutes')
 
   useEffect(() => {
     const savedAccess = sessionStorage.getItem('mimou_admin_access')
@@ -57,6 +59,8 @@ export default function Admin() {
     sessionStorage.removeItem('mimou_admin_access')
     setAccessGranted(false)
     setBooks([])
+    setSearch('')
+    setCategory('Toutes')
   }
 
   async function deleteBook(book) {
@@ -111,6 +115,31 @@ export default function Admin() {
       setDeleting(null)
     }
   }
+
+  const categories = useMemo(() => {
+    const values = books
+      .map(book => book.category?.trim())
+      .filter(Boolean)
+
+    return ['Toutes', ...Array.from(new Set(values)).sort((a, b) => a.localeCompare(b))]
+  }, [books])
+
+  const filteredBooks = useMemo(() => {
+    const searchValue = search.trim().toLowerCase()
+
+    return books.filter(book => {
+      const matchesCategory =
+        category === 'Toutes' || book.category?.trim() === category
+
+      const matchesSearch =
+        !searchValue ||
+        book.title?.toLowerCase().includes(searchValue) ||
+        book.author?.toLowerCase().includes(searchValue) ||
+        book.category?.toLowerCase().includes(searchValue)
+
+      return matchesCategory && matchesSearch
+    })
+  }, [books, search, category])
 
   if (!accessGranted) {
     return (
@@ -197,14 +226,45 @@ export default function Admin() {
               </div>
             </div>
 
+            <section className="admin-filters">
+              <div className="search-box">
+                <label htmlFor="admin-search">Rechercher un livre</label>
+                <input
+                  id="admin-search"
+                  type="search"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Titre, auteur ou catégorie..."
+                />
+              </div>
+
+              <div className="filter-box">
+                <label htmlFor="admin-category">Catégorie</label>
+                <select
+                  id="admin-category"
+                  value={category}
+                  onChange={e => setCategory(e.target.value)}
+                >
+                  {categories.map(item => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+              </div>
+            </section>
+
+            <div className="admin-results-info">
+              {filteredBooks.length} livre{filteredBooks.length !== 1 ? 's' : ''} affiché{filteredBooks.length !== 1 ? 's' : ''}
+              {search || category !== 'Toutes' ? ' selon les filtres' : ''}
+            </div>
+
             <section className="admin-list">
-              {books.length === 0 ? (
+              {filteredBooks.length === 0 ? (
                 <div className="empty-card">
-                  <h2>Aucun livre publié</h2>
-                  <p>Les livres publiés apparaîtront ici.</p>
+                  <h2>Aucun livre trouvé</h2>
+                  <p>Essayez une autre recherche ou une autre catégorie.</p>
                 </div>
               ) : (
-                books.map(book => (
+                filteredBooks.map(book => (
                   <article className="admin-row" key={book.id}>
                     <img
                       src={book.cover_url || 'https://placehold.co/160x220/0f172a/94a3b8?text=BOOK'}
