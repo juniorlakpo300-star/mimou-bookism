@@ -8,10 +8,12 @@ const SECTION_KEY = 'mimou_bookism_section'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
+const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const BOOK_FIELDS = 'id,title,author,category,description,cover_url,file_path,file_url,book_url,is_free,price,views_count'
 
 function getFavorites() { try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] } }
 function getBookmarks() { try { return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || '{}') } catch { return {} } }
+function getProgress() { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') } catch { return {} } }
 
 export default function Reader() {
   const { id } = useParams()
@@ -21,6 +23,7 @@ export default function Reader() {
   const [comment, setComment] = useState('')
   const [favorites, setFavorites] = useState(getFavorites)
   const [bookmarks, setBookmarks] = useState(getBookmarks)
+  const [progress, setProgress] = useState(() => Number(getProgress()[id] || 0))
   const [rating, setRating] = useState(0)
   const [averageRating, setAverageRating] = useState(0)
   const [ratingCount, setRatingCount] = useState(0)
@@ -30,6 +33,10 @@ export default function Reader() {
   const [sending, setSending] = useState(false)
   const [ratingSending, setRatingSending] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    setProgress(Number(getProgress()[id] || 0))
+  }, [id])
 
   useEffect(() => {
     let active = true
@@ -48,7 +55,7 @@ export default function Reader() {
         setBook(bookData)
         const manga = String(bookData?.category || '').toLowerCase().startsWith('manga •')
         localStorage.setItem(SECTION_KEY, manga ? 'manga' : 'books')
-        localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: bookData.id, title: bookData.title, cover_url: bookData.cover_url, at: Date.now() }))
+        localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: bookData.id, title: bookData.title, cover_url: bookData.cover_url, progress: Number(getProgress()[id] || 0), at: Date.now() }))
         const readCount = Number(localStorage.getItem('mimou_bookism_read_count') || 0) + 1
         localStorage.setItem('mimou_bookism_read_count', String(readCount))
         supabase.rpc('increment_book_views', { book_uuid: bookData.id }).then(({ error: viewError }) => { if (viewError) console.warn('Views:', viewError) })
@@ -95,6 +102,15 @@ export default function Reader() {
     setRatingSending(false)
   }
 
+  function saveProgress(value) {
+    const cleanValue = Math.max(0, Math.min(100, Number(value)))
+    setProgress(cleanValue)
+    const next = getProgress()
+    next[id] = cleanValue
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(next))
+    localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: book?.id || id, title: book?.title || '', cover_url: book?.cover_url || '', progress: cleanValue, at: Date.now() }))
+  }
+
   function toggleFavorite() { const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]; setFavorites(next); localStorage.setItem(FAVORITES_KEY, JSON.stringify(next)) }
   function toggleBookmark() { const next = { ...bookmarks }; if (next[id]) delete next[id]; else next[id] = { id, title: book.title, cover_url: book.cover_url, savedAt: Date.now() }; setBookmarks(next); localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(next)) }
   function toggleReadingMode() { const next = !readingMode; setReadingMode(next); localStorage.setItem('mimou_bookism_reading_mode', next ? '1' : '0') }
@@ -116,10 +132,16 @@ export default function Reader() {
         <Link to={backPath} className="btn">← {isManga ? 'Mangathèque' : 'Bibliothèque'}</Link>
         <h1>{book.title}</h1>
         <p className="reader-author">{book.author || (isManga ? 'Mangaka inconnu' : 'Auteur inconnu')} {book.category ? `• ${book.category}` : ''} • {book.is_free ? 'Gratuit' : 'Premium'}</p>
-        <div className="reader-meta-strip"><span>👁️ {Number(book.views_count || 0) + 1} lecture(s)</span><span>⭐ {averageRating ? averageRating.toFixed(1) : '—'} / 5 ({ratingCount})</span></div>
+        <div className="reader-meta-strip"><span>👁️ {Number(book.views_count || 0) + 1} lecture(s)</span><span>⭐ {averageRating ? averageRating.toFixed(1) : '—'} / 5 ({ratingCount})</span><span>📖 {progress}% lu</span></div>
         <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} decoding="async" />
         {book.description && <p className="reader-description">{book.description}</p>}
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
+        <section className="reading-progress-panel">
+          <div className="reading-progress-heading"><strong>📖 Ma progression</strong><span>{progress}%</span></div>
+          <div className="reading-progress-track" aria-hidden="true"><div className="reading-progress-fill" style={{ width: `${progress}%` }} /></div>
+          <input type="range" min="0" max="100" step="5" value={progress} onChange={e => saveProgress(e.target.value)} aria-label="Progression de lecture" />
+          <small>Déplace le curseur pour enregistrer ta progression. Elle restera enregistrée sur cet appareil.</small>
+        </section>
         <div className="reader-actions">
           <button type="button" className={`btn ${isFavorite ? 'favorite-reading' : ''}`} onClick={toggleFavorite}>{isFavorite ? '❤️ Dans ma bibliothèque' : '♡ Ajouter à ma bibliothèque'}</button>
           <button type="button" className={`btn ${isBookmarked ? 'bookmark-reading' : ''}`} onClick={toggleBookmark}>{isBookmarked ? '🔖 Marqué' : '🔖 Marquer'}</button>
