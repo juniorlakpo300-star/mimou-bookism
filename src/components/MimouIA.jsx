@@ -8,8 +8,7 @@ export default function MimouIA() {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content:
-        "Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre."
+      content: 'Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre.'
     }
   ])
   const [loading, setLoading] = useState(false)
@@ -29,9 +28,7 @@ export default function MimouIA() {
     const { data, error: searchError } = await supabase
       .from('books')
       .select('id, title, author, category, description, cover_url, is_free')
-      .or(
-        `title.ilike.%${safeQuery}%,author.ilike.%${safeQuery}%,category.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`
-      )
+      .or(`title.ilike.%${safeQuery}%,author.ilike.%${safeQuery}%,category.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`)
       .limit(3)
 
     if (searchError) {
@@ -52,15 +49,10 @@ export default function MimouIA() {
     setMessage('')
     setError('')
     setBooks([])
-
-    const assistantIndex = messages.length + 1
-
-    setMessages(prev => [
-      ...prev,
-      { role: 'user', content: text },
-      { role: 'assistant', content: '' }
-    ])
     setLoading(true)
+
+    // On ajoute uniquement le message utilisateur avant l'appel API.
+    setMessages(prev => [...prev, { role: 'user', content: text }])
 
     try {
       const response = await fetch('/api/chat', {
@@ -81,45 +73,36 @@ export default function MimouIA() {
         throw new Error('Lia n’a reçu aucune réponse du service IA.')
       }
 
-      setMessages(prev =>
-        prev.map((item, index) =>
-          index === assistantIndex
-            ? { ...item, content: reply }
-            : item
-        )
-      )
-
-      setLoading(false)
-
-      const lowerText = text.toLowerCase()
-      const wantsBook =
-        lowerText.includes('livre') ||
-        lowerText.includes('roman') ||
-        lowerText.includes('auteur') ||
-        lowerText.includes('lecture') ||
-        lowerText.includes('business') ||
-        lowerText.includes('amour') ||
-        lowerText.includes('science') ||
-        lowerText.includes('développement')
-
-      if (wantsBook) {
-        searchBooks(text)
-      }
+      // On ajoute la réponse complète en une seule fois : aucun streaming
+      // ni index calculé à l'avance ne peut couper la réponse.
+      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
       console.error('Erreur Lia:', err)
       setError(err.message || 'Erreur inconnue.')
-      setMessages(prev =>
-        prev.map((item, index) =>
-          index === assistantIndex
-            ? {
-                ...item,
-                content:
-                  'Désolée 😕 Je rencontre actuellement un problème pour me connecter au service IA.'
-              }
-            : item
-        )
-      )
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: 'Désolée 😕 Je rencontre actuellement un problème pour me connecter au service IA.'
+        }
+      ])
+    } finally {
       setLoading(false)
+    }
+
+    const lowerText = text.toLowerCase()
+    const wantsBook =
+      lowerText.includes('livre') ||
+      lowerText.includes('roman') ||
+      lowerText.includes('auteur') ||
+      lowerText.includes('lecture') ||
+      lowerText.includes('business') ||
+      lowerText.includes('amour') ||
+      lowerText.includes('science') ||
+      lowerText.includes('développement')
+
+    if (wantsBook) {
+      searchBooks(text)
     }
   }
 
@@ -143,18 +126,13 @@ export default function MimouIA() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(prev => !prev)}
-        aria-label="Ouvrir Lia"
-        style={{
-          position: 'fixed', right: '24px', bottom: '24px', zIndex: 99999,
-          display: 'flex', alignItems: 'center', gap: '9px', padding: '13px 19px',
-          border: '1px solid #475569', borderRadius: '999px', background: '#111827',
-          color: '#ffffff', fontSize: '15px', fontWeight: '700', cursor: 'pointer',
-          boxShadow: '0 15px 40px rgba(0,0,0,0.5)'
-        }}
-      >
+      <button type="button" onClick={() => setOpen(prev => !prev)} aria-label="Ouvrir Lia" style={{
+        position: 'fixed', right: '24px', bottom: '24px', zIndex: 99999,
+        display: 'flex', alignItems: 'center', gap: '9px', padding: '13px 19px',
+        border: '1px solid #475569', borderRadius: '999px', background: '#111827',
+        color: '#ffffff', fontSize: '15px', fontWeight: '700', cursor: 'pointer',
+        boxShadow: '0 15px 40px rgba(0,0,0,0.5)'
+      }}>
         <span style={{
           width: '28px', height: '28px', borderRadius: '50%', background: '#ffffff',
           color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -183,67 +161,67 @@ export default function MimouIA() {
 
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
               <strong style={{ color: '#ffffff', fontSize: '15px' }}>Lia</strong>
-              <span style={{ color: '#94a3b8', fontSize: '11px' }}>
-                Intelligence de MIMOU BOOKISM
-              </span>
+              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Intelligence de MIMOU BOOKISM</span>
             </div>
 
             <button type="button" onClick={clearConversation} title="Nouvelle conversation" style={{
-              border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '18px',
-              cursor: 'pointer', padding: '5px'
+              border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '18px', cursor: 'pointer', padding: '5px'
             }}>↻</button>
 
             <button type="button" onClick={() => setOpen(false)} aria-label="Fermer Lia" style={{
-              border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '25px',
-              cursor: 'pointer', padding: '2px'
+              border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '25px', cursor: 'pointer', padding: '2px'
             }}>×</button>
           </div>
 
           <div style={{
-            flex: 1, overflowY: 'auto', padding: '16px', display: 'flex',
-            flexDirection: 'column', gap: '12px'
+            flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px'
           }}>
             {messages.map((item, index) => (
               <div key={`${item.role}-${index}`} style={{
-                display: 'flex',
-                justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start'
+                display: 'flex', justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start'
               }}>
                 <div style={{
                   maxWidth: '84%', padding: '11px 13px',
                   borderRadius: item.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   background: item.role === 'user' ? '#1e293b' : '#111827',
                   border: item.role === 'user' ? '1px solid #334155' : '1px solid #1e293b',
-                  color: '#f8fafc', fontSize: '13px', lineHeight: '1.55', whiteSpace: 'pre-wrap',
-                  minHeight: item.content ? undefined : '22px'
+                  color: '#f8fafc', fontSize: '13px', lineHeight: '1.55', whiteSpace: 'pre-wrap'
                 }}>
-                  {item.content || (index === messages.length - 1 && loading ? 'Lia écrit...' : '')}
+                  {item.content}
                 </div>
               </div>
             ))}
 
-            {searchLoading && (
-              <div style={{ color: '#64748b', fontSize: '11px', paddingLeft: '4px' }}>
-                Recherche de livres...
+            {loading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{
+                  padding: '11px 13px', borderRadius: '16px 16px 16px 4px',
+                  background: '#111827', border: '1px solid #1e293b', color: '#94a3b8',
+                  fontSize: '13px'
+                }}>
+                  Lia écrit...
+                </div>
               </div>
+            )}
+
+            {searchLoading && (
+              <div style={{ color: '#64748b', fontSize: '11px', paddingLeft: '4px' }}>Recherche de livres...</div>
             )}
 
             {error && (
               <div style={{
-                color: '#fca5a5', fontSize: '12px', padding: '8px 10px',
-                background: '#1f1720', borderRadius: '10px'
+                color: '#fca5a5', fontSize: '12px', padding: '8px 10px', background: '#1f1720', borderRadius: '10px'
               }}>{error}</div>
             )}
 
             {books.length > 0 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-                <span style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: '700' }}>
-                  📚 Livres trouvés
-                </span>
+                <span style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: '700' }}>📚 Livres trouvés</span>
 
                 {books.map(book => (
                   <article key={book.id} style={{
-                    display: 'flex', gap: '11px', padding: '10px',
-                    border: '1px solid #1e293b', borderRadius: '13px', background: '#111827'
+                    display: 'flex', gap: '11px', padding: '10px', border: '1px solid #1e293b',
+                    borderRadius: '13px', background: '#111827'
                   }}>
                     <img
                       src={book.cover_url || 'https://placehold.co/80x110/111827/94a3b8?text=BOOK'}
@@ -285,9 +263,7 @@ export default function MimouIA() {
                 fontSize: '19px', fontWeight: '900', cursor: loading || !message.trim() ? 'not-allowed' : 'pointer'
               }}>↑</button>
             </div>
-            <div style={{ marginTop: '7px', color: '#64748b', fontSize: '9px', textAlign: 'center' }}>
-              Lia • MIMOU BOOKISM
-            </div>
+            <div style={{ marginTop: '7px', color: '#64748b', fontSize: '9px', textAlign: 'center' }}>Lia • MIMOU BOOKISM</div>
           </div>
         </section>
       )}
