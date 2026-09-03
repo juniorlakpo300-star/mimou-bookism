@@ -4,63 +4,7 @@ import { supabase } from '../supabase.js'
 import { useAuth } from '../AuthContext.jsx'
 
 const LITERARY_CATEGORIES = [
-  'Roman',
-  'Nouvelle',
-  'Poésie',
-  'Théâtre',
-  'Conte',
-  'Fable',
-  'Mémoires',
-  'Autobiographie',
-  'Biographie',
-  'Essai',
-  'Chronique',
-  'Correspondance',
-  'Journal intime',
-  'Littérature jeunesse',
-  'Littérature pour adolescents',
-  'Littérature africaine',
-  'Littérature francophone',
-  'Littérature étrangère',
-  'Roman historique',
-  'Roman policier',
-  'Roman d’aventure',
-  'Roman fantastique',
-  'Roman de science-fiction',
-  'Roman de fantasy',
-  'Roman romantique',
-  'Roman psychologique',
-  'Roman philosophique',
-  'Roman social',
-  'Roman épistolaire',
-  'Roman initiatique',
-  'Roman autobiographique',
-  'Dystopie',
-  'Utopie',
-  'Thriller',
-  'Horreur',
-  'Mystère',
-  'Aventure',
-  'Comédie',
-  'Tragédie',
-  'Drame',
-  'Satire',
-  'Épopée',
-  'Légende',
-  'Mythe',
-  'Spiritualité',
-  'Philosophie',
-  'Développement personnel',
-  'Éducation',
-  'Histoire',
-  'Société',
-  'Politique',
-  'Économie',
-  'Sciences',
-  'Art et culture',
-  'Religion',
-  'Jeunesse',
-  'Autre'
+  'Roman','Nouvelle','Poésie','Théâtre','Conte','Fable','Mémoires','Autobiographie','Biographie','Essai','Chronique','Correspondance','Journal intime','Littérature jeunesse','Littérature pour adolescents','Littérature africaine','Littérature francophone','Littérature étrangère','Roman historique','Roman policier','Roman d’aventure','Roman fantastique','Roman de science-fiction','Roman de fantasy','Roman romantique','Roman psychologique','Roman philosophique','Roman social','Roman épistolaire','Roman initiatique','Roman autobiographique','Dystopie','Utopie','Thriller','Horreur','Mystère','Aventure','Comédie','Tragédie','Drame','Satire','Épopée','Légende','Mythe','Spiritualité','Philosophie','Développement personnel','Éducation','Histoire','Société','Politique','Économie','Sciences','Art et culture','Religion','Jeunesse','Autre'
 ]
 
 export default function Publier() {
@@ -90,7 +34,9 @@ export default function Publier() {
       if (!title) throw new Error('Indique le titre du livre.')
       if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
       if (pdf.type !== 'application/pdf') throw new Error('Le livre doit être un fichier PDF.')
-      if (!isFree && price <= 0) throw new Error('Indique un prix supérieur à 0 ou coche Livre gratuit.')
+      if (!isFree && (price <= 0 || !Number.isInteger(price) || price % 5 !== 0)) {
+        throw new Error('Pour un livre payant, le prix doit être un nombre entier et un multiple de 5 FCFA.')
+      }
 
       const id = crypto.randomUUID()
       const coverExt = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -104,7 +50,6 @@ export default function Publier() {
       if (pdfError) throw pdfError
 
       const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
-      const { data: pdfData } = supabase.storage.from('books').getPublicUrl(pdfPath)
 
       const { error: insertError } = await supabase.from('books').insert({
         id,
@@ -116,8 +61,9 @@ export default function Publier() {
         price: isFree ? 0 : price,
         is_free: isFree,
         cover_url: coverData.publicUrl,
-        book_url: pdfData.publicUrl,
-        file_url: pdfData.publicUrl,
+        file_path: pdfPath,
+        book_url: null,
+        file_url: null
       })
       if (insertError) throw insertError
 
@@ -154,12 +100,10 @@ export default function Publier() {
               <span>Catégorie *</span>
               <select name="category" defaultValue="" required>
                 <option value="" disabled>Choisir un genre littéraire</option>
-                {LITERARY_CATEGORIES.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
+                {LITERARY_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
               </select>
             </label>
-            <label className="field"><span>Prix</span><input name="price" type="number" min="0" step="0.01" defaultValue="0" /></label>
+            <label className="field"><span>Prix (FCFA)</span><input name="price" type="number" min="0" step="1" defaultValue="0" /></label>
           </div>
           <label className="field"><span>Description</span><textarea name="description" rows="4" placeholder="Présente brièvement le livre..." /></label>
           <label className="check-field"><input name="is_free" type="checkbox" defaultChecked /> Livre gratuit</label>
