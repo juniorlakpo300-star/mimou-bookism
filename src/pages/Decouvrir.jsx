@@ -5,6 +5,7 @@ import { supabase } from '../supabase.js'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
 const HISTORY_KEY = 'mimou_bookism_reading_history'
+const NOTES_KEY = 'mimou_bookism_reading_notes'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const VISIT_KEY = 'mimou_bookism_last_visit'
@@ -20,6 +21,7 @@ export default function Decouvrir() {
   const [loading, setLoading] = useState(true)
   const [lastRead, setLastRead] = useState(null)
   const [history, setHistory] = useState(readHistory)
+  const [notes, setNotes] = useState(readObject(NOTES_KEY))
   const [newSinceVisit, setNewSinceVisit] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
   const [notificationsRead, setNotificationsRead] = useState(false)
@@ -31,6 +33,7 @@ export default function Decouvrir() {
     const saved = localStorage.getItem(LAST_READ_KEY)
     if (saved) try { setLastRead(JSON.parse(saved)) } catch {}
     setHistory(readHistory())
+    setNotes(readObject(NOTES_KEY))
     const previousVisit = Number(localStorage.getItem(VISIT_KEY) || 0)
     async function load() {
       const { data, error } = await supabase.from('books').select('id,title,author,category,description,cover_url,created_at,views_count,is_free').order('created_at', { ascending: false })
@@ -59,6 +62,7 @@ export default function Decouvrir() {
   const favorites = useMemo(() => favoriteIds.map(id => works.find(work => work.id === id)).filter(Boolean), [works, favoriteIds])
   const savedBookmarks = useMemo(() => Object.values(bookmarks).map(item => works.find(work => work.id === item.id) || item).filter(Boolean), [works, bookmarks])
   const historyWorks = useMemo(() => history.map(item => works.find(work => work.id === item.id) || item).filter(Boolean).slice(0, 12), [works, history])
+  const noteWorks = useMemo(() => Object.entries(notes).map(([id, note]) => ({ work: works.find(item => item.id === id), note })).filter(item => item.work && String(item.note).trim()).slice(0, 6), [works, notes])
   const notificationItems = useMemo(() => {
     const previousVisit = Number(localStorage.getItem(VISIT_KEY) || 0)
     return previousVisit ? works.filter(work => new Date(work.created_at).getTime() > previousVisit).slice(0, 5) : []
@@ -122,6 +126,8 @@ export default function Decouvrir() {
         <section className="discover-section"><div className="discover-heading"><div><span>✨ NOUVEAUTÉS</span><h2>Les dernières publications</h2></div><span>{newest.length} œuvres</span></div>{newest.length === 0 ? <div className="empty-card"><h2>Pas encore de publication</h2></div> : <div className="discover-grid">{newest.map(work => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt={`Couverture de ${work.title || 'œuvre'}`} loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>{typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'}</p></div></Link>)}</div>}</section>
 
         <section className="discover-section"><div className="discover-heading"><div><span>🕘 HISTORIQUE RÉCENT</span><h2>Tes lectures récentes</h2></div><span>{historyWorks.length} / 12</span></div>{historyWorks.length ? <div className="discover-history-grid">{historyWorks.map(work => { const item = history.find(entry => entry.id === work.id) || work; const itemProgress = Number(progressMap[work.id] ?? item.progress ?? 0); return <Link key={work.id} to={`/read/${work.id}`} className="history-discover-card"><img src={work.cover_url || FALLBACK_COVER} alt="" loading="lazy" /><div><span className="section-kicker">{itemProgress >= 100 ? 'LECTURE TERMINÉE' : 'EN COURS'}</span><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'} · <strong>{itemProgress}%</strong></p><div className="continue-progress-track" aria-hidden="true"><div className="continue-progress-fill" style={{ width: `${itemProgress}%` }} /></div><span className="btn primary">{itemProgress >= 100 ? '📖 Relire' : '▶️ Reprendre'}</span></div></Link> })}</div> : <div className="empty-card"><h2>Aucune lecture récente</h2><p>Ouvre une œuvre pour commencer ton historique.</p><div><Link to="/livres" className="btn primary">📚 Choisir un livre</Link> <Link to="/mangas" className="btn">🗯️ Choisir un manga</Link></div></div>}</section>
+
+        {noteWorks.length > 0 && <section className="discover-section"><div className="discover-heading"><div><span>📝 MES NOTES</span><h2>Mes notes de lecture</h2></div><span>{noteWorks.length} note(s)</span></div><div className="empty-card">{noteWorks.map(({ work, note }) => <Link key={work.id} to={`/read/${work.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', padding: '14px 0', borderBottom: '1px solid rgba(148,163,184,.14)' }}><strong>{work.title}</strong><p className="muted" style={{ margin: '6px 0 0', whiteSpace: 'pre-wrap' }}>{String(note).length > 220 ? `${String(note).slice(0, 220)}…` : note}</p></Link>)}</div></section>}
 
         <section className="discover-section"><div className="discover-heading"><div><span>🏆 TES BADGES</span><h2>Ta collection de récompenses</h2></div><span>{unlockedBadges}/{badges.length} débloqués</span></div><div className="badge-showcase">{badges.map(badge => <div key={badge.id} className={`reader-badge ${badge.unlocked ? 'unlocked' : ''}`}><span className="badge-icon">{badge.icon}</span><strong>{badge.title}</strong><small>{badge.unlocked ? '✓ Débloqué' : badge.text}</small></div>)}</div></section>
 
