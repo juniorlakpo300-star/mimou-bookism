@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message, books = [] } = req.body || {}
+    const { message, books = [], dictionary = [] } = req.body || {}
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message manquant.' })
     }
@@ -14,32 +14,33 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Message vide.' })
     }
 
-    const normalized = cleanMessage
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[!?.,;:]+/g, '')
-      .trim()
-
-    const greetings = new Set(['bonjour', 'bonsoir', 'salut', 'hello', 'hey', 'coucou', 'bjr', 'slt'])
-    if (greetings.has(normalized)) {
-      return res.status(200).json({ reply: 'Bonjour 👋 ! Comment puis-je t’aider aujourd’hui ?' })
-    }
-
     const catalogue = Array.isArray(books)
       ? books.map((book) => ({
           id: book?.id || '',
           title: book?.title || '',
           author: book?.author || '',
           category: book?.category || '',
-          description: book?.description || '',
-          cover_url: book?.cover_url || ''
+          description: book?.description || ''
+        }))
+      : []
+
+    const dictionaryEntries = Array.isArray(dictionary)
+      ? dictionary.map((entry) => ({
+          word: entry?.word || '',
+          type: entry?.type || '',
+          definition: entry?.definition || '',
+          example: entry?.example || '',
+          tags: Array.isArray(entry?.tags) ? entry.tags : []
         }))
       : []
 
     const catalogueText = catalogue.length
-      ? `CATALOGUE COMPLET ACTUEL DE MIMOU BOOKISM (${catalogue.length} livres) :\n${JSON.stringify(catalogue)}`
-      : 'CATALOGUE ACTUEL : aucun livre n’a été transmis.'
+      ? `CATALOGUE ACTUEL DE MIMOU BOOKISM (${catalogue.length} œuvres) :\n${JSON.stringify(catalogue)}`
+      : 'CATALOGUE ACTUEL : aucune œuvre n’a été transmise.'
+
+    const dictionaryText = dictionaryEntries.length
+      ? `DICTIONNAIRE ACTUEL DE MIMOU BOOKISM (${dictionaryEntries.length} entrées) :\n${JSON.stringify(dictionaryEntries)}`
+      : 'DICTIONNAIRE ACTUEL : aucune entrée n’a été transmise.'
 
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
@@ -56,18 +57,21 @@ export default async function handler(req, res) {
             parts: [{
               text: `Tu es Lia, l’assistante intelligente officielle de MIMOU BOOKISM. Tu tutoies toujours l’utilisateur et réponds uniquement en français.
 
-Tu as accès au catalogue complet transmis ci-dessous. Pour toute question concernant les livres disponibles, les auteurs, les catégories ou les descriptions, base-toi sur ce catalogue et n’invente aucune information.
+Tu as accès au catalogue et au dictionnaire transmis ci-dessous. Utilise uniquement ces données pour les informations spécifiques au site.
 
 RÈGLES IMPORTANTES :
-- Si l’utilisateur demande quels livres sont disponibles, liste les livres réellement présents dans le catalogue.
-- Si l’utilisateur demande un livre africain, une catégorie ou un auteur précis, cherche dans les champs titre, auteur, catégorie et description.
-- Si l’utilisateur demande une recommandation, recommande uniquement un ou plusieurs livres réellement présents et explique brièvement pourquoi.
-- Si aucun livre ne correspond, dis-le clairement.
-- Tu peux parler du catalogue et des métadonnées fournies, mais ne prétends jamais avoir lu le contenu intégral d’un livre si son contenu n’est pas fourni.
+- Pour une question sur les livres, auteurs, catégories ou descriptions, base-toi sur le catalogue et n’invente aucune information.
+- Pour une recommandation, recommande uniquement des œuvres réellement présentes dans le catalogue.
+- Pour une question sur un mot, une expression, un terme manga ou japonais présent dans le dictionnaire, donne la définition et l’exemple fournis.
+- Si le mot demandé n’est pas dans le dictionnaire, dis-le clairement et conseille de consulter la page 📖 Dictionnaire.
+- Tu peux expliquer simplement une notion générale, mais ne prétends jamais avoir lu le contenu intégral d’une œuvre si son contenu n’est pas fourni.
+- Si l’utilisateur demande où trouver une rubrique, indique clairement : Livres, Mangas ou Dictionnaire.
 - Réponds avec des phrases complètes. Ne coupe jamais une réponse en plein milieu.
-- Pour une question simple, réponds en 1 à 4 phrases. Pour une liste de livres, tu peux utiliser des puces.
+- Pour une question simple, réponds en 1 à 4 phrases. Pour une liste, utilise des puces.
 
-${catalogueText}`
+${catalogueText}
+
+${dictionaryText}`
             }]
           },
           contents: [{ role: 'user', parts: [{ text: cleanMessage }] }],
