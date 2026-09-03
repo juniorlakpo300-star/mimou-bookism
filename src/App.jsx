@@ -5,8 +5,6 @@ import Choix from './pages/Choix'
 import Catalogue from './pages/Catalogue'
 import Publier from './pages/Publier'
 import Reader from './pages/Reader'
-import Connexion from './pages/Connexion'
-import Inscription from './pages/Inscription'
 import Ecrivain from './pages/Ecrivain'
 import Admin from './pages/Admin'
 
@@ -26,8 +24,6 @@ export default function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/read/:id" element={<Reader />} />
           <Route path="/lire/:id" element={<Reader />} />
-          <Route path="/connexion" element={<Connexion />} />
-          <Route path="/inscription" element={<Inscription />} />
           <Route path="*" element={<div className="state"><h1>404 - Page non trouvée</h1></div>} />
         </Routes>
         <MimouIA />
