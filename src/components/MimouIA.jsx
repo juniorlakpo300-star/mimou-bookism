@@ -18,7 +18,12 @@ const buttonStyle = {
 }
 
 function normalize(text = '') {
-  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[!?.,;:]+/g, '')
+    .trim()
 }
 
 export default function MimouIA() {
@@ -26,6 +31,7 @@ export default function MimouIA() {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [catalogueLoading, setCatalogueLoading] = useState(false)
   const [error, setError] = useState('')
   const [books, setBooks] = useState([])
   const [results, setResults] = useState([])
@@ -41,34 +47,41 @@ export default function MimouIA() {
   const subtitle = theme === 'manga' ? 'Compagne de ta mangathèque' : theme === 'books' ? 'Gardienne de ta bibliothèque' : theme === 'admin' ? 'Besoin d’aide ? Je suis là.' : 'Intelligence de MIMOU BOOKISM'
 
   useEffect(() => {
-    if (open) loadBooks()
-  }, [open])
+    if (open && books.length === 0 && !catalogueLoading) loadBooks()
+  }, [open, books.length, catalogueLoading])
 
   async function loadBooks() {
-    const allBooks = []
-    const pageSize = 1000
+    setCatalogueLoading(true)
+    setError('')
 
-    for (let from = 0; ; from += pageSize) {
-      const { data, error: booksError } = await supabase
-        .from('books')
-        .select('id,title,author,category,description,cover_url')
-        .order('title', { ascending: true })
-        .range(from, from + pageSize - 1)
+    try {
+      const allBooks = []
+      const pageSize = 1000
 
-      if (booksError) {
-        setError('Impossible de charger le catalogue de Lia.')
-        return
+      for (let from = 0; ; from += pageSize) {
+        const { data, error: booksError } = await supabase
+          .from('books')
+          .select('id,title,author,category,description,cover_url')
+          .order('title', { ascending: true })
+          .range(from, from + pageSize - 1)
+
+        if (booksError) throw booksError
+
+        allBooks.push(...(data || []))
+        if (!data || data.length < pageSize) break
       }
 
-      allBooks.push(...(data || []))
-      if (!data || data.length < pageSize) break
+      setBooks(allBooks)
+    } catch (loadError) {
+      console.error('Erreur catalogue Lia:', loadError)
+      setError('Impossible de charger le catalogue de Lia.')
+    } finally {
+      setCatalogueLoading(false)
     }
-
-    setBooks(allBooks)
   }
 
   function searchBooks(query) {
-    const q = normalize(query).trim()
+    const q = normalize(query)
     if (!q) return []
 
     const words = q.split(/\s+/).filter((word) => word.length > 2)
@@ -76,18 +89,51 @@ export default function MimouIA() {
 
     return books
       .map((book) => {
-        const text = normalize([book.title, book.author, book.category, book.description].filter(Boolean).join(' '))
-        const score = words.reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0)
+        const title = normalize(book.title)
+        const author = normalize(book.author)
+        const category = normalize(book.category)
+        const description = normalize(book.description)
+        const text = [title, author, category, description].filter(Boolean).join(' ')
+        const score = words.reduce((total, word) => {
+          let points = 0
+          if (title.includes(word)) points += 4
+          if (author.includes(word)) points += 3
+          if (category.includes(word)) points += 2
+          if (description.includes(word)) points += 1
+          return total + points
+        }, 0)
         return { book, score }
       })
       .filter((item) => item.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => b.score - a.score || String(a.book.title).localeCompare(String(b.book.title)))
       .slice(0, 3)
       .map((item) => item.book)
   }
 
+  function getQuickReply(text) {
+    const normalized = normalize(text)
+
+    if (/^(bonjour|bonsoir|salut|hello|hey|coucou|bjr|slt)$/.test(normalized)) {
+      return 'Bonjour 👋 ! Comment puis-je t’aider aujourd’hui ?'
+    }
+
+    if (/\b(dictionnaire|mot difficile|definition|definir|terme japonais|terme manga)\b/.test(normalized)) {
+      return 'Bien sûr 📖 ! Tu peux consulter le Dictionnaire MIMOU BOOKISM pour comprendre les mots difficiles et les termes manga/japonais.'
+    }
+
+    if (/\b(manga|mangas)\b/.test(normalized) && !/\b(livre|livres)\b/.test(normalized)) {
+      return '🎴 Tu peux découvrir la mangathèque directement depuis la page Mangas.'
+    }
+
+    if (/\b(livre|livres|bibliotheque|bibliothèque)\b/.test(normalized) && !/\b(manga|mangas)\b/.test(normalized)) {
+      return '📚 Tu peux parcourir tous les livres disponibles dans la bibliothèque MIMOU BOOKISM.'
+    }
+
+    return ''
+  }
+
   async function sendMessage() {
-    const text = message.trim()
+    const text = message.trim().slice(0, 1200)
     if (!text || loading) return
 
     setMessage('')
@@ -98,11 +144,22 @@ export default function MimouIA() {
     const found = searchBooks(text)
     setResults(found)
 
+    const quickReply = getQuickReply(text)
+    if (quickReply) {
+      setMessages((prev) => [...prev, { role: 'assistant', content: quickReply }])
+      setLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 25000)
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, books })
+        body: JSON.stringify({ message: text, books }),
+        signal: controller.signal
       })
 
       const data = await response.json().catch(() => ({}))
@@ -113,9 +170,14 @@ export default function MimouIA() {
 
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
     } catch (err) {
-      setError(err?.message || 'Impossible de contacter Lia.')
-      setMessages((prev) => [...prev, { role: 'assistant', content: 'Désolée, je rencontre un petit problème. Réessaie dans un instant.' }])
+      const errorMessage = err?.name === 'AbortError'
+        ? 'Lia met trop de temps à répondre. Réessaie dans quelques secondes.'
+        : err?.message || 'Impossible de contacter Lia.'
+
+      setError(errorMessage)
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Désolée, je rencontre un petit problème. Tu peux réessayer dans un instant.' }])
     } finally {
+      window.clearTimeout(timeout)
       setLoading(false)
     }
   }
@@ -153,6 +215,7 @@ export default function MimouIA() {
               </div>
             ))}
 
+            {catalogueLoading && <div style={{ color: '#94a3b8', fontSize: '13px', padding: '8px' }}>Lia prépare le catalogue…</div>}
             {loading && <div style={{ color: '#94a3b8', fontSize: '13px', padding: '8px' }}>Lia réfléchit…</div>}
             {error && <div style={{ color: '#f87171', fontSize: '12px', padding: '6px' }}>{error}</div>}
 
@@ -161,7 +224,7 @@ export default function MimouIA() {
                 <div style={{ color: '#94a3b8', fontSize: '11px', fontWeight: 800, letterSpacing: '1px', marginBottom: '9px' }}>ŒUVRES CORRESPONDANTES</div>
                 {results.map((book) => (
                   <Link key={book.id} to={`/read/${book.id}`} style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px', padding: '9px', borderRadius: '12px', background: '#0f172a', border: '1px solid #1e293b', color: '#fff' }}>
-                    {book.cover_url && <img src={book.cover_url} alt="" style={{ width: '38px', height: '52px', objectFit: 'cover', borderRadius: '6px' }} />}
+                    {book.cover_url && <img src={book.cover_url} alt="" loading="lazy" style={{ width: '38px', height: '52px', objectFit: 'cover', borderRadius: '6px' }} />}
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700, fontSize: '13px' }}>{book.title}</div>
                       {book.author && <div style={{ color: '#94a3b8', fontSize: '11px', marginTop: '3px' }}>{book.author}</div>}
@@ -175,7 +238,7 @@ export default function MimouIA() {
 
           <form onSubmit={(event) => { event.preventDefault(); sendMessage() }} style={{ padding: '12px', borderTop: '1px solid #1e293b' }}>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <textarea value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage() } }} placeholder="Écris à Lia…" rows={2} disabled={loading} style={{ flex: 1, minWidth: 0, resize: 'none', border: '1px solid #334155', borderRadius: '11px', background: '#0f172a', color: '#fff', padding: '9px 11px', outline: 'none' }} />
+              <textarea value={message} onChange={(event) => setMessage(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage() } }} placeholder="Écris à Lia…" rows={2} maxLength={1200} disabled={loading} style={{ flex: 1, minWidth: 0, resize: 'none', border: '1px solid #334155', borderRadius: '11px', background: '#0f172a', color: '#fff', padding: '9px 11px', outline: 'none' }} />
               <button type="submit" disabled={loading || !message.trim()} style={{ alignSelf: 'flex-end', border: 'none', borderRadius: '11px', padding: '10px 13px', background: theme === 'manga' ? '#7c3aed' : theme === 'books' ? '#047857' : '#2563eb', color: '#fff', fontWeight: 700, cursor: 'pointer' }}>Envoyer</button>
             </div>
           </form>
