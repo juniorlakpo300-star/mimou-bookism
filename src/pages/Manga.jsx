@@ -3,11 +3,18 @@ import { Link } from 'react-router-dom'
 import { supabase } from '../supabase.js'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+MANGA'
+const FAVORITES_KEY = 'mimou_bookism_favorites'
+const LAST_READ_KEY = 'mimou_bookism_last_read'
+
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
+}
 
 export default function Manga() {
   const [mangas, setMangas] = useState([])
   const [search, setSearch] = useState('')
   const [genre, setGenre] = useState('Tous les genres')
+  const [favorites, setFavorites] = useState(getFavorites)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -40,6 +47,16 @@ export default function Manga() {
     })
   }, [mangas, search, genre])
 
+  function toggleFavorite(id) {
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]
+    setFavorites(next)
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
+  }
+
+  function rememberRead(manga) {
+    localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: manga.id, title: manga.title, cover_url: manga.cover_url, at: Date.now() }))
+  }
+
   if (loading) return <div className="state manga-theme">Chargement des mangas...</div>
   if (error) return <div className="state error manga-theme">Erreur : {error}</div>
 
@@ -51,6 +68,7 @@ export default function Manga() {
           <nav className="nav">
             <Link to="/livres" className="btn">📚 Livres</Link>
             <Link to="/mangas" className="btn active">🗯️ Mangas</Link>
+            <Link to="/favoris" className="btn">❤️ Ma bibliothèque</Link>
             <Link to="/admin" className="btn">🛠️ Administration</Link>
           </nav>
         </header>
@@ -91,18 +109,23 @@ export default function Manga() {
         ) : (
           <section className="book-grid">
             {filtered.map(manga => (
-              <Link key={manga.id} to={`/read/${manga.id}`} className="book-card">
-                <div className="cover-wrap">
-                  <img src={manga.cover_url || FALLBACK_COVER} alt={`Couverture de ${manga.title || 'manga'}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
-                  <span className={`book-status ${manga.is_free ? 'free' : 'premium'}`}>{manga.is_free ? 'Gratuit' : 'Premium'}</span>
-                </div>
-                <div className="book-info">
-                  <span className="badge">🗯️ MANGA</span>
-                  <h2 className="book-title">{manga.title || 'Sans titre'}</h2>
-                  <p className="book-author">{manga.author || 'Mangaka inconnu'}</p>
-                  <span className="badge">{String(manga.category || '').replace(/^manga\s*•\s*/i, '')}</span>
-                </div>
-              </Link>
+              <article key={manga.id} className="book-card enhanced-book-card">
+                <Link to={`/read/${manga.id}`} className="book-card-link" onClick={() => rememberRead(manga)}>
+                  <div className="cover-wrap">
+                    <img src={manga.cover_url || FALLBACK_COVER} alt={`Couverture de ${manga.title || 'manga'}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+                    <span className={`book-status ${manga.is_free ? 'free' : 'premium'}`}>{manga.is_free ? 'Gratuit' : 'Premium'}</span>
+                  </div>
+                  <div className="book-info">
+                    <span className="badge">🗯️ MANGA</span>
+                    <h2 className="book-title">{manga.title || 'Sans titre'}</h2>
+                    <p className="book-author">{manga.author || 'Mangaka inconnu'}</p>
+                    <span className="badge">{String(manga.category || '').replace(/^manga\s*•\s*/i, '')}</span>
+                  </div>
+                </Link>
+                <button type="button" className={`favorite-btn ${favorites.includes(manga.id) ? 'is-favorite' : ''}`} onClick={() => toggleFavorite(manga.id)} aria-label={favorites.includes(manga.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
+                  {favorites.includes(manga.id) ? '❤️' : '♡'} {favorites.includes(manga.id) ? 'Favori' : 'Ajouter'}
+                </button>
+              </article>
             ))}
           </section>
         )}
