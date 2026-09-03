@@ -7,6 +7,7 @@ const LAST_READ_KEY = 'mimou_bookism_last_read'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const VISIT_KEY = 'mimou_bookism_last_visit'
+const REWARDS_KEY = 'mimou_bookism_rewards'
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 
 function readIds(key) { try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] } }
@@ -18,6 +19,7 @@ export default function Decouvrir() {
   const [lastRead, setLastRead] = useState(null)
   const [newSinceVisit, setNewSinceVisit] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [rewards, setRewards] = useState(() => readObject(REWARDS_KEY))
   const favoriteIds = readIds(FAVORITES_KEY)
   const bookmarks = readObject(BOOKMARKS_KEY)
 
@@ -37,15 +39,40 @@ export default function Decouvrir() {
     load()
   }, [])
 
+  useEffect(() => {
+    const next = { ...rewards, favoriteCount: favoriteIds.length, lastSeenAt: Date.now() }
+    if (lastRead?.id) next.lastReadId = lastRead.id
+    if (JSON.stringify(next) !== JSON.stringify(rewards)) {
+      setRewards(next)
+      localStorage.setItem(REWARDS_KEY, JSON.stringify(next))
+    }
+  }, [favoriteIds.length, lastRead?.id])
+
   const newest = works.slice(0, 6)
   const trends = useMemo(() => [...works].sort((a,b) => Number(b.views_count || 0) - Number(a.views_count || 0)).slice(0, 5), [works])
   const favorites = useMemo(() => favoriteIds.map(id => works.find(work => work.id === id)).filter(Boolean), [works, favoriteIds])
   const savedBookmarks = useMemo(() => Object.values(bookmarks).map(item => works.find(work => work.id === item.id) || item).filter(Boolean), [works, bookmarks])
   const readCount = Number(localStorage.getItem('mimou_bookism_read_count') || 0)
-  const badgeCount = [readCount >= 1, readCount >= 5, favoriteIds.length >= 5, favoriteIds.length >= 10, works.some(w => String(w.category || '').toLowerCase().startsWith('manga •'))].filter(Boolean).length
+  const progressMap = readObject(PROGRESS_KEY)
+  const completedCount = Object.values(progressMap).filter(value => Number(value) >= 100).length
+  const mangaDiscovered = works.some(w => String(w.category || '').toLowerCase().startsWith('manga •'))
+  const badges = [
+    { id: 'first-read', icon: '📖', title: 'Premier chapitre', text: 'Lire une œuvre', unlocked: readCount >= 1 },
+    { id: 'bibliophile', icon: '📚', title: 'Bibliophile', text: '5 lectures', unlocked: readCount >= 5 },
+    { id: 'collector', icon: '❤️', title: 'Collectionneur', text: '5 favoris', unlocked: favoriteIds.length >= 5 },
+    { id: 'grand-collector', icon: '💎', title: 'Grand collectionneur', text: '10 favoris', unlocked: favoriteIds.length >= 10 },
+    { id: 'manga-explorer', icon: '🗯️', title: 'Explorateur manga', text: 'Découvrir un manga', unlocked: mangaDiscovered },
+    { id: 'finisher', icon: '🏁', title: 'Finisher', text: 'Terminer une lecture', unlocked: completedCount >= 1 },
+    { id: 'marathon', icon: '🔥', title: 'Marathon', text: '10 lectures', unlocked: readCount >= 10 },
+    { id: 'bookmark-master', icon: '🔖', title: 'Mémoire d’or', text: '3 marque-pages', unlocked: savedBookmarks.length >= 3 },
+  ]
+  const unlockedBadges = badges.filter(badge => badge.unlocked).length
+  const points = readCount * 10 + favoriteIds.length * 5 + savedBookmarks.length * 3 + completedCount * 25
+  const level = Math.max(1, Math.floor(points / 100) + 1)
+  const levelProgress = points % 100
+  const progress = Number(progressMap[lastRead?.id] || lastRead?.progress || 0)
   const isManga = work => String(work?.category || '').toLowerCase().startsWith('manga •')
   const typeLabel = work => isManga(work) ? '🗯️ MANGA' : '📚 LIVRE'
-  const progress = Number(readObject(PROGRESS_KEY)[lastRead?.id] || lastRead?.progress || 0)
 
   if (loading) return <div className="state">Préparation de la découverte...</div>
 
@@ -71,11 +98,13 @@ export default function Decouvrir() {
 
         {lastRead && works.some(work => work.id === lastRead.id) && <section className="continue-card"><div className="continue-cover"><img src={lastRead.cover_url || FALLBACK_COVER} alt="" loading="lazy" /></div><div><span className="section-kicker">REPRENDRE MA LECTURE</span><h2>{lastRead.title}</h2><p>Continue ton aventure là où tu t'es arrêté.</p><div className="continue-progress"><div className="continue-progress-heading"><span>Progression</span><strong>{progress}%</strong></div><div className="continue-progress-track" aria-hidden="true"><div className="continue-progress-fill" style={{ width: `${progress}%` }} /></div></div><Link to={`/read/${lastRead.id}`} className="btn primary">📖 Continuer</Link></div></section>}
 
+        <section className="reward-panel"><div className="reward-main"><span className="section-kicker">🏆 TON PROFIL LECTEUR</span><h2>Niveau {level}</h2><p>{points} points · encore {100 - levelProgress} points pour le prochain niveau</p><div className="reward-progress"><div className="reward-progress-fill" style={{ width: `${levelProgress}%` }} /></div></div><div className="reward-stats"><div><strong>{unlockedBadges}</strong><span>Badges</span></div><div><strong>{readCount}</strong><span>Lectures</span></div><div><strong>{completedCount}</strong><span>Terminées</span></div></div></section>
+
         <section className="discover-section"><div className="discover-heading"><div><span>🔥 TENDANCES</span><h2>Les œuvres les plus lues</h2></div><span>Top {trends.length}</span></div>{trends.length ? <div className="discover-grid">{trends.map((work,index) => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt="" loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>#{index + 1} · {typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'} · 👁️ {Number(work.views_count || 0)} lecture(s)</p></div></Link>)}</div> : <div className="empty-card"><p>Les tendances apparaîtront après les premières lectures.</p></div>}</section>
 
         <section className="discover-section"><div className="discover-heading"><div><span>NOUVEAUTÉS</span><h2>Les dernières publications</h2></div><span>{newest.length} œuvres</span></div>{newest.length === 0 ? <div className="empty-card"><h2>Pas encore de publication</h2></div> : <div className="discover-grid">{newest.map(work => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt={`Couverture de ${work.title || 'œuvre'}`} loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>{typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'}</p></div></Link>)}</div>}</section>
 
-        <section className="discover-section"><div className="discover-heading"><div><span>🏆 TES BADGES</span><h2>Ta progression</h2></div><span>{badgeCount}/5 débloqués</span></div><div className="badge-showcase"><div className={readCount >= 1 ? 'reader-badge unlocked' : 'reader-badge'}>📖<strong>Premier chapitre</strong><small>Lire une œuvre</small></div><div className={readCount >= 5 ? 'reader-badge unlocked' : 'reader-badge'}>📚<strong>Bibliophile</strong><small>5 lectures</small></div><div className={favoriteIds.length >= 5 ? 'reader-badge unlocked' : 'reader-badge'}>❤️<strong>Collectionneur</strong><small>5 favoris</small></div><div className={favoriteIds.length >= 10 ? 'reader-badge unlocked' : 'reader-badge'}>💎<strong>Grand collectionneur</strong><small>10 favoris</small></div><div className={works.some(w => isManga(w)) ? 'reader-badge unlocked' : 'reader-badge'}>🗯️<strong>Explorateur manga</strong><small>Découvrir un manga</small></div></div></section>
+        <section className="discover-section"><div className="discover-heading"><div><span>🏆 TES BADGES</span><h2>Ta collection de récompenses</h2></div><span>{unlockedBadges}/{badges.length} débloqués</span></div><div className="badge-showcase">{badges.map(badge => <div key={badge.id} className={`reader-badge ${badge.unlocked ? 'unlocked' : ''}`}><span className="badge-icon">{badge.icon}</span><strong>{badge.title}</strong><small>{badge.unlocked ? '✓ Débloqué' : badge.text}</small></div>)}</div></section>
 
         {savedBookmarks.length > 0 && <section className="discover-section"><div className="discover-heading"><div><span>🔖 MARQUE-PAGES</span><h2>À reprendre</h2></div></div><div className="discover-mini-grid">{savedBookmarks.slice(0,4).map(work => <Link key={work.id} to={`/read/${work.id}`} className="discover-mini"><img src={work.cover_url || FALLBACK_COVER} alt="" loading="lazy" /><div><span>{typeLabel(work)}</span><strong>{work.title}</strong></div></Link>)}</div></section>}
 
