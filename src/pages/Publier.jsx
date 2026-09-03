@@ -13,7 +13,7 @@ export default function Publier() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!authLoading && !user) navigate('/connexion', { replace: true })
+    if (!authLoading && !user) navigate('/admin', { replace: true })
   }, [user, authLoading, navigate])
 
   async function handleSubmit(event) {
@@ -41,18 +41,12 @@ export default function Publier() {
       const coverPath = `${id}.${coverExt}`
       const pdfPath = `${id}.pdf`
 
-      const { error: coverError } = await supabase.storage
-        .from('covers')
-        .upload(coverPath, cover, { upsert: false })
+      const { error: coverError } = await supabase.storage.from('covers').upload(coverPath, cover, { upsert: false })
       if (coverError) throw new Error(`Erreur couverture : ${coverError.message}`)
 
-      const { error: pdfError } = await supabase.storage
-        .from('books')
-        .upload(pdfPath, pdf, {
-          contentType: 'application/pdf',
-          cacheControl: '3600',
-          upsert: false
-        })
+      const { error: pdfError } = await supabase.storage.from('books').upload(pdfPath, pdf, {
+        contentType: 'application/pdf', cacheControl: '3600', upsert: false
+      })
       if (pdfError) {
         await supabase.storage.from('covers').remove([coverPath])
         throw new Error(`Erreur PDF : ${pdfError.message}. Vérifie le bucket « books » et ses permissions Supabase.`)
@@ -60,8 +54,6 @@ export default function Publier() {
 
       const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
 
-      // Le bucket books est privé : on conserve le chemin du fichier et
-      // la page Lecteur créera ensuite une URL signée pour le PDF.
       const { error: insertError } = await supabase.from('books').insert({
         id,
         owner_id: user.id,
@@ -98,8 +90,8 @@ export default function Publier() {
     <main className="form-page">
       <div className="form-card wide">
         <div className="page-topline">
-          <Link to="/catalogue" className="btn">← Catalogue</Link>
-          <Link to="/ecrivain" className="btn secondary">Mes publications</Link>
+          <Link to="/admin" className="btn">← Administration</Link>
+          <Link to="/catalogue" className="btn secondary">Catalogue</Link>
         </div>
 
         <h1>Publier un livre</h1>
@@ -107,44 +99,16 @@ export default function Publier() {
 
         <form onSubmit={handleSubmit}>
           <div className="form-row">
-            <label className="field">
-              <span>Titre *</span>
-              <input name="title" placeholder="Titre du livre" required />
-            </label>
-            <label className="field">
-              <span>Auteur</span>
-              <input name="author" placeholder="Nom de l'auteur" />
-            </label>
+            <label className="field"><span>Titre *</span><input name="title" placeholder="Titre du livre" required /></label>
+            <label className="field"><span>Auteur</span><input name="author" placeholder="Nom de l'auteur" /></label>
           </div>
 
-          <label className="field">
-            <span>Catégorie *</span>
-            <select name="category" defaultValue="" required>
-              <option value="" disabled>Choisir un genre littéraire</option>
-              {LITERARY_CATEGORIES.map(category => (
-                <option key={category} value={category}>{category}</option>
-              ))}
-            </select>
-          </label>
+          <label className="field"><span>Catégorie *</span><select name="category" defaultValue="" required><option value="" disabled>Choisir un genre littéraire</option>{LITERARY_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}</select></label>
+          <label className="field"><span>Description</span><textarea name="description" rows="4" placeholder="Présente brièvement le livre..." /></label>
+          <label className="field"><span>Couverture *</span><input name="cover" type="file" accept="image/*" required /></label>
+          <label className="field"><span>Fichier PDF *</span><input name="pdf" type="file" accept="application/pdf,.pdf" required /></label>
 
-          <label className="field">
-            <span>Description</span>
-            <textarea name="description" rows="4" placeholder="Présente brièvement le livre..." />
-          </label>
-
-          <label className="field">
-            <span>Couverture *</span>
-            <input name="cover" type="file" accept="image/*" required />
-          </label>
-
-          <label className="field">
-            <span>Fichier PDF *</span>
-            <input name="pdf" type="file" accept="application/pdf,.pdf" required />
-          </label>
-
-          <button className="btn primary full" type="submit" disabled={loading}>
-            {loading ? 'Publication en cours...' : 'Publier gratuitement'}
-          </button>
+          <button className="btn primary full" type="submit" disabled={loading}>{loading ? 'Publication en cours...' : 'Publier gratuitement'}</button>
         </form>
       </div>
     </main>
