@@ -12,25 +12,26 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée.' })
 
   try {
-    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
-    if (!token) return send(res, 401, { error: 'Tu dois être connecté.' })
-
-    const { data: userData } = await admin.auth.getUser(token)
-    const user = userData?.user
-    if (!user) return send(res, 401, { error: 'Session invalide.' })
-
     const { bookId } = req.body || {}
     if (!bookId) return send(res, 400, { error: 'Livre manquant.' })
 
     const { data: book, error: bookError } = await admin
       .from('books')
-      .select('id,title,is_free,owner_id,file_path,book_url,file_url')
+      .select('id,title,is_free,file_path,book_url,file_url')
       .eq('id', bookId)
       .single()
 
     if (bookError || !book) return send(res, 404, { error: 'Livre introuvable.' })
 
+    // Un livre gratuit peut être lu sans compte.
     if (!book.is_free) {
+      const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '')
+      if (!token) return send(res, 401, { error: 'Connecte-toi pour acheter ce livre.', requiresLogin: true })
+
+      const { data: userData } = await admin.auth.getUser(token)
+      const user = userData?.user
+      if (!user) return send(res, 401, { error: 'Session invalide.' })
+
       const { data: purchase } = await admin
         .from('purchases')
         .select('id')
@@ -42,14 +43,13 @@ export default async function handler(req, res) {
       if (!purchase) return send(res, 403, { error: 'Livre payant : achat requis.', requiresPurchase: true })
     }
 
-    // file_path est le chemin Storage recommandé pour les nouveaux livres.
     if (book.file_path) {
       const { data, error } = await admin.storage.from('books').createSignedUrl(book.file_path, 3600)
       if (error || !data?.signedUrl) throw error || new Error('Impossible de créer le lien de lecture.')
       return send(res, 200, { url: data.signedUrl, expiresIn: 3600 })
     }
 
-    // Compatibilité avec les anciens livres déjà publiés.
+    // Compatibilité avec les anciens livres gratuits déjà publiés.
     if (book.is_free && (book.file_url || book.book_url)) {
       return send(res, 200, { url: book.file_url || book.book_url, legacy: true })
     }
