@@ -33,8 +33,8 @@ export default function MimouIA() {
     { role: 'assistant', content: 'Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre.' }
   ])
 
-  const isManga = location.pathname.startsWith('/mangas') || location.pathname.startsWith('/read/') && false
-  const theme = location.pathname.startsWith('/mangas') ? 'manga' : location.pathname.startsWith('/livres') || location.pathname.startsWith('/catalogue') ? 'books' : 'home'
+  const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('mimou_bookism_section') : ''
+  const theme = location.pathname.startsWith('/mangas') ? 'manga' : location.pathname.startsWith('/livres') || location.pathname.startsWith('/catalogue') ? 'books' : location.pathname.startsWith('/read/') && storedTheme === 'manga' ? 'manga' : location.pathname.startsWith('/read/') && storedTheme === 'books' ? 'books' : 'home'
   const avatar = theme === 'manga' ? '🎴' : theme === 'books' ? '📖' : '🤖'
   const title = theme === 'manga' ? 'Lia Manga' : theme === 'books' ? 'Lia Lecture' : 'Lia'
   const subtitle = theme === 'manga' ? 'Compagne de ta mangathèque' : theme === 'books' ? 'Gardienne de ta bibliothèque' : 'Intelligence de MIMOU BOOKISM'
@@ -75,13 +75,7 @@ export default function MimouIA() {
 
     return books
       .map((book) => {
-        const text = normalize([
-          book.title,
-          book.author,
-          book.category,
-          book.description
-        ].filter(Boolean).join(' '))
-
+        const text = normalize([book.title, book.author, book.category, book.description].filter(Boolean).join(' '))
         const score = words.reduce((total, word) => total + (text.includes(word) ? 1 : 0), 0)
         return { book, score }
       })
@@ -127,13 +121,7 @@ export default function MimouIA() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className={`lia-toggle ${theme}`}
-        style={buttonStyle}
-        aria-label="Ouvrir Lia"
-      >
+      <button type="button" onClick={() => setOpen((value) => !value)} className={`lia-toggle ${theme}`} style={buttonStyle} aria-label="Ouvrir Lia">
         {open ? '✕ Fermer Lia' : `${avatar} ${title}`}
       </button>
 
