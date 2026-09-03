@@ -14,8 +14,6 @@ export default function Reader() {
   const [loading, setLoading] = useState(true)
   const [accessLoading, setAccessLoading] = useState(false)
   const [pdfUrl, setPdfUrl] = useState('')
-  const [purchaseRequired, setPurchaseRequired] = useState(false)
-  const [loginRequired, setLoginRequired] = useState(false)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
 
@@ -36,12 +34,6 @@ export default function Reader() {
 
   useEffect(() => {
     if (!book) return
-    if (!book.is_free && !user) {
-      setLoginRequired(true)
-      setPurchaseRequired(false)
-      setPdfUrl('')
-      return
-    }
 
     let cancelled = false
     async function loadAccess() {
@@ -61,19 +53,8 @@ export default function Reader() {
         const result = await response.json()
         if (cancelled) return
 
-        if (response.status === 403 && result.requiresPurchase) {
-          setPurchaseRequired(true)
-          setPdfUrl('')
-        } else if (response.status === 401 && result.requiresLogin) {
-          setLoginRequired(true)
-          setPdfUrl('')
-        } else if (!response.ok) {
-          throw new Error(result.error || 'Impossible d’ouvrir le livre.')
-        } else {
-          setPdfUrl(result.url || '')
-          setPurchaseRequired(false)
-          setLoginRequired(false)
-        }
+        if (!response.ok) throw new Error(result.error || 'Impossible d’ouvrir le livre.')
+        setPdfUrl(result.url || '')
       } catch (err) {
         if (!cancelled) setError(err.message || 'Impossible d’ouvrir le livre.')
       } finally {
@@ -82,7 +63,7 @@ export default function Reader() {
     }
     loadAccess()
     return () => { cancelled = true }
-  }, [book, user])
+  }, [book])
 
   async function addComment(event) {
     event.preventDefault()
@@ -109,16 +90,13 @@ export default function Reader() {
   if (error && !book) return <div className="state error">Erreur : {error}</div>
   if (!book) return <div className="state">Livre introuvable.</div>
 
-  const price = Math.round(Number(book.price || 0))
-
   return (
     <main className="reader">
       <div className="reader-card">
         <Link to="/catalogue" className="btn">← Catalogue</Link>
         <h1>{book.title}</h1>
         <p className="reader-author">
-          {book.author || 'Auteur inconnu'} {book.category ? `• ${book.category}` : ''}
-          {book.is_free ? ' • Gratuit' : ` • ${price.toLocaleString('fr-FR')} FCFA`}
+          {book.author || 'Auteur inconnu'} {book.category ? `• ${book.category}` : ''} • Gratuit
         </p>
 
         <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
@@ -126,37 +104,12 @@ export default function Reader() {
 
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
 
-        {book.is_free ? (
-          <div className="reader-actions">
-            {accessLoading ? <span className="muted">Ouverture du livre...</span> : pdfUrl ? <>
-              <a className="btn primary" href={pdfUrl} target="_blank" rel="noreferrer">📖 Lire le PDF</a>
-              <a className="btn" href={pdfUrl} download>Télécharger</a>
-            </> : <span className="muted">Aucun PDF disponible.</span>}
-          </div>
-        ) : purchaseRequired ? (
-          <div className="reader-actions" style={{ display: 'block' }}>
-            <div style={{ padding: 20, borderRadius: 14, background: 'rgba(255,255,255,.05)', marginBottom: 14 }}>
-              <strong>🔒 Livre payant</strong>
-              <p className="muted">Achète ce livre pour débloquer sa lecture et pouvoir le relire depuis ton compte.</p>
-            </div>
-            <Link className="btn primary" to={`/paiement?book=${book.id}`}>🛒 Acheter — {price.toLocaleString('fr-FR')} FCFA</Link>
-          </div>
-        ) : loginRequired ? (
-          <div className="reader-actions" style={{ display: 'block' }}>
-            <div style={{ padding: 20, borderRadius: 14, background: 'rgba(255,255,255,.05)', marginBottom: 14 }}>
-              <strong>🔐 Connexion requise</strong>
-              <p className="muted">Connecte-toi pour acheter ce livre et le conserver dans tes achats.</p>
-            </div>
-            <Link className="btn primary" to={`/connexion?redirect=${encodeURIComponent(`/read/${book.id}`)}`}>Se connecter</Link>
-          </div>
-        ) : (
-          <div className="reader-actions">
-            {accessLoading ? <span className="muted">Vérification de ton achat...</span> : pdfUrl ? <>
-              <a className="btn primary" href={pdfUrl} target="_blank" rel="noreferrer">📖 Lire le PDF</a>
-              <a className="btn" href={pdfUrl} download>Télécharger</a>
-            </> : <span className="muted">Aucun PDF disponible.</span>}
-          </div>
-        )}
+        <div className="reader-actions">
+          {accessLoading ? <span className="muted">Ouverture du livre...</span> : pdfUrl ? <>
+            <a className="btn primary" href={pdfUrl} target="_blank" rel="noreferrer">📖 Lire le PDF</a>
+            <a className="btn" href={pdfUrl} download>Télécharger</a>
+          </> : <span className="muted">Aucun PDF disponible.</span>}
+        </div>
 
         {pdfUrl && <iframe className="pdf-frame" src={pdfUrl} title={`Lecture de ${book.title}`} />}
 
