@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
+import Home from './pages/Home'
+import Choix from './pages/Choix'
 import Catalogue from './pages/Catalogue'
 import Publier from './pages/Publier'
 import Reader from './pages/Reader'
@@ -9,7 +11,6 @@ import Ecrivain from './pages/Ecrivain'
 import Admin from './pages/Admin'
 
 import MimouIA from './components/MimouIA'
-
 import { AuthProvider } from './AuthContext.jsx'
 
 export default function App() {
@@ -17,7 +18,8 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Catalogue />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/choix" element={<Choix />} />
           <Route path="/catalogue" element={<Catalogue />} />
           <Route path="/publier" element={<Publier />} />
           <Route path="/ecrivain" element={<Ecrivain />} />
@@ -26,17 +28,8 @@ export default function App() {
           <Route path="/lire/:id" element={<Reader />} />
           <Route path="/connexion" element={<Connexion />} />
           <Route path="/inscription" element={<Inscription />} />
-
-          <Route
-            path="*"
-            element={
-              <div className="state">
-                <h1>404 - Page non trouvée</h1>
-              </div>
-            }
-          />
+          <Route path="*" element={<div className="state"><h1>404 - Page non trouvée</h1></div>} />
         </Routes>
-
         <MimouIA />
       </BrowserRouter>
     </AuthProvider>
