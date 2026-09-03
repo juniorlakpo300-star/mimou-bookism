@@ -2,7 +2,7 @@ import '../landing.css'
 import { Link } from 'react-router-dom'
 
 const PUBLIC_SITE_URL = 'https://mimou-bookism-hz66pjgau-mimou.vercel.app/'
-const WHATSAPP_URL = 'https://wa.me/2250566111378?text=Bonjour%20MIMOU%20BOOKISM%2C%20je%20souhaite%20publier%20sur%20votre%20site.'
+const WHATSAPP_URL = 'https://wa.me/2250566111378?text=Bonjour%20MIMOU%20BOOKISM%2C%20je%20souhaite%20publier%20mon%20livre%20ou%20mon%20manga%20sur%20le%20site.'
 
 export default function Home() {
   const shareSite = async () => {
@@ -29,46 +29,117 @@ export default function Home() {
   }
 
   return (
-    <main className="landing-page">
-      <header className="landing-header">
-        <Link to="/" className="landing-brand">MIMOU <span>BOOKISM</span></Link>
+    <main className="landing-page home-v2">
+      <header className="landing-header home-header">
+        <Link to="/" className="brand-v2" aria-label="MIMOU BOOKISM - Accueil">
+          <span className="brand-mark" aria-hidden="true">
+            <span className="brand-mark-page brand-mark-page-left" />
+            <span className="brand-mark-page brand-mark-page-right" />
+            <span className="brand-mark-dialogue">✦</span>
+          </span>
+          <span className="brand-wordmark">MIMOU <b>BOOKISM</b></span>
+        </Link>
+
         <div className="landing-header-actions">
-          <button type="button" className="share-site-btn" onClick={shareSite}>🔗 Partager le site</button>
-          <Link to="/admin" className="btn admin-btn">🛠️ Admin</Link>
+          <button type="button" className="share-site-btn" onClick={shareSite}>↗ Partager</button>
+          <Link to="/admin" className="btn admin-btn">⚙ Admin</Link>
         </div>
       </header>
 
-      <section className="landing-hero">
-        <div className="landing-badge">📚 MIMOU BOOKISM</div>
-        <h1>Bienvenue sur<br /><span>TON ESPACE DE LECTURE</span></h1>
-        <p>Découvre une bibliothèque de livres et une mangathèque réunies dans MIMOU BOOKISM.</p>
+      <section className="home-hero-v2">
+        <div className="hero-orbit hero-orbit-one" />
+        <div className="hero-orbit hero-orbit-two" />
+
+        <div className="landing-badge hero-badge-v2">UNE SEULE IDENTITÉ · DEUX UNIVERS · MILLE HISTOIRES</div>
+        <h1>Les histoires<br /><span>prennent vie ici.</span></h1>
+        <p className="hero-lead-v2">
+          Bienvenue sur <strong>MIMOU BOOKISM</strong>, un espace où les mots des livres
+          rencontrent l'énergie des mangas.
+        </p>
+
+        <div className="hero-quote-card">
+          <span className="quote-label">PENSER · LIRE · TRANSMETTRE</span>
+          <p>« Un peuple sans connaissance de son histoire est comme un arbre sans racines. »</p>
+          <small>— Marcus Garvey</small>
+        </div>
       </section>
 
-      <section className="landing-options">
-        <Link to="/livres" className="access-card free-card">
-          <div className="access-icon">📚</div>
-          <div><span className="access-label">BIBLIOTHÈQUE</span><h2>Livres</h2><p>Romans, contes, poésie, essais et autres œuvres littéraires.</p></div>
-          <strong>→</strong>
-        </Link>
+      <section className="worlds-section">
+        <div className="section-heading-v2">
+          <span>CHOISIS TON UNIVERS</span>
+          <h2>Deux mondes.<br /><em>Une même passion.</em></h2>
+        </div>
 
-        <Link to="/mangas" className="access-card premium-card">
-          <div className="access-icon">🗯️</div>
-          <div><span className="access-label">MANGATHÈQUE</span><h2>Mangas</h2><p>Retrouve les mangas, leurs tomes et leurs chapitres dans un espace dédié.</p></div>
-          <strong>→</strong>
-        </Link>
+        <div className="worlds-grid-v2">
+          <Link to="/livres" className="world-card-v2 books-world">
+            <div className="world-number">01</div>
+            <div className="world-symbol books-symbol" aria-hidden="true">
+              <span />
+              <span />
+              <i>✦</i>
+            </div>
+            <div className="world-content-v2">
+              <span className="world-kicker">BIBLIOTHÈQUE</span>
+              <h3>Livres</h3>
+              <p>Romans, contes, poésie, essais et voix littéraires à découvrir.</p>
+            </div>
+            <div className="world-arrow">→</div>
+          </Link>
+
+          <Link to="/mangas" className="world-card-v2 manga-world">
+            <div className="world-number">02</div>
+            <div className="world-symbol manga-symbol" aria-hidden="true">
+              <span>漫</span><span>画</span><i>⚡</i>
+            </div>
+            <div className="world-content-v2">
+              <span className="world-kicker">MANGATHÈQUE</span>
+              <h3>Mangas</h3>
+              <p>Des aventures, des personnages et des univers graphiques à parcourir.</p>
+            </div>
+            <div className="world-arrow">→</div>
+          </Link>
+        </div>
       </section>
 
-      <section className="landing-options" style={{ marginTop: '24px' }}>
-        <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="access-card free-card">
-          <div className="access-icon">📲</div>
-          <div><span className="access-label">PUBLICATION</span><h2>Publier sur MIMOU BOOKISM</h2><p>Tu veux publier ton livre ou ton manga sur le site ? Contacte-nous sur WhatsApp au <strong>+225 05 66 11 13 78</strong>.</p></div>
-          <strong>→</strong>
+      <section className="quotes-v2">
+        <div className="quote-panel quote-naruto">
+          <span className="quote-tag">MANGA · NARUTO</span>
+          <p>« Je ne reviendrai jamais sur ma parole. »</p>
+          <small>— Naruto Uzumaki</small>
+        </div>
+        <div className="quote-panel quote-eren">
+          <span className="quote-tag">MANGA · EREN</span>
+          <p>« Je continuerai d'avancer. »</p>
+          <small>— Eren Yeager</small>
+        </div>
+      </section>
+
+      <section className="author-v2">
+        <div className="author-line" />
+        <div>
+          <span>VOIX AFRICAINE</span>
+          <blockquote>« En Afrique, un vieillard qui meurt est une bibliothèque qui brûle. »</blockquote>
+          <p>— Amadou Hampâté Bâ</p>
+        </div>
+        <div className="author-line" />
+      </section>
+
+      <section className="publish-v2">
+        <div>
+          <span className="world-kicker">TU AS UNE HISTOIRE À PARTAGER ?</span>
+          <h2>Fais-la entrer dans<br /><em>MIMOU BOOKISM.</em></h2>
+          <p>Tu veux proposer ton livre ou ton manga ? Contacte-nous directement.</p>
+        </div>
+        <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="whatsapp-v2">
+          <span>◉</span> Nous contacter sur WhatsApp <b>→</b>
         </a>
       </section>
 
-      <section style={{ maxWidth: 900, margin: '0 auto', padding: '0 20px 60px', textAlign: 'center' }}>
-        <Link to="/choix" className="landing-enter">Entrer dans MIMOU BOOKISM <span>→</span></Link>
-      </section>
+      <footer className="home-footer-v2">
+        <Link to="/" className="footer-brand-v2">MIMOU <span>BOOKISM</span></Link>
+        <span>Lire · Imaginer · Créer · Transmettre</span>
+        <Link to="/admin" className="footer-admin">Espace administration →</Link>
+      </footer>
     </main>
   )
 }
