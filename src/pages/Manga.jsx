@@ -21,14 +21,8 @@ export default function Manga() {
 
   useEffect(() => {
     let active = true
-
     async function loadMangas() {
-      const { data, error } = await supabase
-        .from('books')
-        .select(MANGA_FIELDS)
-        .ilike('category', 'Manga •%')
-        .order('created_at', { ascending: false })
-
+      const { data, error } = await supabase.from('books').select(MANGA_FIELDS).ilike('category', 'Manga •%').order('created_at', { ascending: false })
       if (!active) return
       if (error) setError(error.message)
       else setMangas(data || [])
@@ -84,64 +78,21 @@ export default function Manga() {
             <h1>Découvrez vos mangas préférés.</h1>
             <p>Explorez les mangas disponibles, choisissez un titre et plongez directement dans sa lecture.</p>
           </div>
-          <div className="hero-card">
-            <span>🗯️</span>
-            <strong>{mangas.length}</strong>
-            <small>manga{mangas.length > 1 ? 's' : ''} disponible{mangas.length > 1 ? 's' : ''}</small>
-          </div>
+          <div className="hero-card"><span>🗯️</span><strong>{mangas.length}</strong><small>manga{mangas.length > 1 ? 's' : ''} disponible{mangas.length > 1 ? 's' : ''}</small></div>
         </section>
 
-        <section className="filters">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔎 Rechercher un manga, un mangaka..." aria-label="Rechercher un manga" />
-          <select value={genre} onChange={e => setGenre(e.target.value)}>
-            {genres.map(item => <option key={item}>{item}</option>)}
-          </select>
+        <section className="filters manga-search-filters">
+          <div className="catalogue-search-shell">
+            <span className="catalogue-search-icon" aria-hidden="true">⌕</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un manga, un mangaka, un genre..." aria-label="Rechercher un manga" />
+            {search && <button type="button" className="catalogue-search-clear" onClick={() => setSearch('')} aria-label="Effacer la recherche">×</button>}
+          </div>
+          <select value={genre} onChange={e => setGenre(e.target.value)}>{genres.map(item => <option key={item}>{item}</option>)}</select>
         </section>
 
-        <div className="catalogue-heading">
-          <div>
-            <p className="section-kicker">MANGATHÈQUE</p>
-            <h2>Mangas disponibles</h2>
-          </div>
-          <span className="result-count">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span>
-        </div>
+        <div className="catalogue-heading"><div><p className="section-kicker">MANGATHÈQUE</p><h2>Mangas disponibles</h2></div><span className="result-count">{filtered.length} résultat{filtered.length > 1 ? 's' : ''}</span></div>
 
-        {filtered.length === 0 ? (
-          <div className="empty-card">
-            <h2>Aucun manga trouvé</h2>
-            <p>Les mangas publiés par l'administrateur apparaîtront ici.</p>
-          </div>
-        ) : (
-          <section className="book-grid">
-            {filtered.map((manga, index) => (
-              <article key={manga.id} className="book-card enhanced-book-card">
-                <Link to={`/read/${manga.id}`} className="book-card-link" onClick={() => rememberRead(manga)}>
-                  <div className="cover-wrap">
-                    <img
-                      src={manga.cover_url || FALLBACK_COVER}
-                      alt={`Couverture de ${manga.title || 'manga'}`}
-                      className="book-cover"
-                      loading={index < 4 ? 'eager' : 'lazy'}
-                      fetchPriority={index < 2 ? 'high' : 'auto'}
-                      decoding="async"
-                      onError={e => { e.currentTarget.src = FALLBACK_COVER }}
-                    />
-                    <span className={`book-status ${manga.is_free ? 'free' : 'premium'}`}>{manga.is_free ? 'Gratuit' : 'Premium'}</span>
-                  </div>
-                  <div className="book-info">
-                    <span className="badge">🗯️ MANGA</span>
-                    <h2 className="book-title">{manga.title || 'Sans titre'}</h2>
-                    <p className="book-author">{manga.author || 'Mangaka inconnu'}</p>
-                    <span className="badge">{String(manga.category || '').replace(/^manga\s*•\s*/i, '')}</span>
-                  </div>
-                </Link>
-                <button type="button" className={`favorite-btn ${favorites.includes(manga.id) ? 'is-favorite' : ''}`} onClick={() => toggleFavorite(manga.id)} aria-label={favorites.includes(manga.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
-                  {favorites.includes(manga.id) ? '❤️' : '♡'} {favorites.includes(manga.id) ? 'Favori' : 'Ajouter'}
-                </button>
-              </article>
-            ))}
-          </section>
-        )}
+        {filtered.length === 0 ? <div className="empty-card"><h2>Aucun manga trouvé</h2><p>Les mangas publiés par l'administrateur apparaîtront ici.</p></div> : <section className="book-grid">{filtered.map((manga, index) => <article key={manga.id} className="book-card enhanced-book-card"><Link to={`/read/${manga.id}`} className="book-card-link" onClick={() => rememberRead(manga)}><div className="cover-wrap"><img src={manga.cover_url || FALLBACK_COVER} alt={`Couverture de ${manga.title || 'manga'}`} className="book-cover" loading={index < 4 ? 'eager' : 'lazy'} fetchPriority={index < 2 ? 'high' : 'auto'} decoding="async" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span className={`book-status ${manga.is_free ? 'free' : 'premium'}`}>{manga.is_free ? 'Gratuit' : 'Premium'}</span></div><div className="book-info"><span className="badge">🗯️ MANGA</span><h2 className="book-title">{manga.title || 'Sans titre'}</h2><p className="book-author">{manga.author || 'Mangaka inconnu'}</p><span className="badge">{String(manga.category || '').replace(/^manga\s*•\s*/i, '')}</span></div></Link><button type="button" className={`favorite-btn ${favorites.includes(manga.id) ? 'is-favorite' : ''}`} onClick={() => toggleFavorite(manga.id)} aria-label={favorites.includes(manga.id) ? 'Retirer des favoris' : 'Ajouter aux favoris'}>{favorites.includes(manga.id) ? '❤️' : '♡'} {favorites.includes(manga.id) ? 'Favori' : 'Ajouter'}</button></article>)}</section>}
       </div>
     </main>
   )
