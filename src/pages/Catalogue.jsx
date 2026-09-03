@@ -82,7 +82,7 @@ export default function Catalogue() {
           <div className="hero-content">
             <p className="eyebrow">BIBLIOTHÈQUE NUMÉRIQUE</p>
             <h1>Découvrez votre prochaine lecture.</h1>
-            <p>Explorez, lisez et téléchargez vos livres préférés sur MIMOU BOOKISM.</p>
+            <p>Explorez, lisez et téléchargez gratuitement vos livres préférés sur MIMOU BOOKISM.</p>
 
             {user && (
               <div className="hero-actions">
@@ -138,9 +138,7 @@ export default function Catalogue() {
                     className="book-cover"
                     onError={e => { e.currentTarget.src = FALLBACK_COVER }}
                   />
-                  <span className={`book-status ${book.is_free ? 'free' : 'paid'}`}>
-                    {book.is_free ? 'Gratuit' : `${book.price || 0} FCFA`}
-                  </span>
+                  <span className="book-status free">Gratuit</span>
                 </div>
 
                 <div className="book-info">
