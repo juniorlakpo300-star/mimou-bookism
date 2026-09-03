@@ -20,6 +20,7 @@ export default function Publier() {
     event.preventDefault()
     if (!user) return
     setLoading(true)
+
     try {
       const form = event.currentTarget
       const title = form.title.value.trim()
@@ -38,13 +39,25 @@ export default function Publier() {
       const coverPath = `${id}.${coverExt}`
       const pdfPath = `${id}.pdf`
 
-      const { error: coverError } = await supabase.storage.from('covers').upload(coverPath, cover)
+      const { error: coverError } = await supabase.storage
+        .from('covers')
+        .upload(coverPath, cover, { upsert: false })
       if (coverError) throw coverError
 
-      const { error: pdfError } = await supabase.storage.from('books').upload(pdfPath, pdf, { contentType: 'application/pdf' })
+      const { error: pdfError } = await supabase.storage
+        .from('books')
+        .upload(pdfPath, pdf, {
+          contentType: 'application/pdf',
+          upsert: false
+        })
       if (pdfError) throw pdfError
 
       const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
+      const { data: pdfData } = supabase.storage.from('books').getPublicUrl(pdfPath)
+
+      if (!pdfData?.publicUrl) {
+        throw new Error('Impossible de créer le lien public du PDF. Vérifie que le bucket « books » est public dans Supabase.')
+      }
 
       const { error: insertError } = await supabase.from('books').insert({
         id,
@@ -56,10 +69,10 @@ export default function Publier() {
         price: 0,
         is_free: true,
         cover_url: coverData.publicUrl,
-        file_path: pdfPath,
-        book_url: null,
-        file_url: null
+        book_url: pdfData.publicUrl,
+        file_url: pdfData.publicUrl
       })
+
       if (insertError) throw insertError
 
       alert('✅ Livre gratuit publié avec succès !')
@@ -82,25 +95,50 @@ export default function Publier() {
           <Link to="/catalogue" className="btn">← Catalogue</Link>
           <Link to="/ecrivain" className="btn secondary">Mes publications</Link>
         </div>
+
         <h1>Publier un livre</h1>
         <p className="form-intro">Partage gratuitement ton œuvre avec les lecteurs de MIMOU BOOKISM.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-row">
-            <label className="field"><span>Titre *</span><input name="title" placeholder="Titre du livre" required /></label>
-            <label className="field"><span>Auteur</span><input name="author" placeholder="Nom de l'auteur" /></label>
+            <label className="field">
+              <span>Titre *</span>
+              <input name="title" placeholder="Titre du livre" required />
+            </label>
+            <label className="field">
+              <span>Auteur</span>
+              <input name="author" placeholder="Nom de l'auteur" />
+            </label>
           </div>
+
           <label className="field">
             <span>Catégorie *</span>
             <select name="category" defaultValue="" required>
               <option value="" disabled>Choisir un genre littéraire</option>
-              {LITERARY_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+              {LITERARY_CATEGORIES.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
             </select>
           </label>
-          <label className="field"><span>Description</span><textarea name="description" rows="4" placeholder="Présente brièvement le livre..." /></label>
-          <label className="field"><span>Couverture *</span><input name="cover" type="file" accept="image/*" required /></label>
-          <label className="field"><span>Fichier PDF *</span><input name="pdf" type="file" accept="application/pdf,.pdf" required /></label>
-          <button className="btn primary full" type="submit" disabled={loading}>{loading ? 'Publication en cours...' : 'Publier gratuitement'}</button>
+
+          <label className="field">
+            <span>Description</span>
+            <textarea name="description" rows="4" placeholder="Présente brièvement le livre..." />
+          </label>
+
+          <label className="field">
+            <span>Couverture *</span>
+            <input name="cover" type="file" accept="image/*" required />
+          </label>
+
+          <label className="field">
+            <span>Fichier PDF *</span>
+            <input name="pdf" type="file" accept="application/pdf,.pdf" required />
+          </label>
+
+          <button className="btn primary full" type="submit" disabled={loading}>
+            {loading ? 'Publication en cours...' : 'Publier gratuitement'}
+          </button>
         </form>
       </div>
     </main>
