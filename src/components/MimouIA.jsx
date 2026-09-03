@@ -34,10 +34,11 @@ export default function MimouIA() {
   ])
 
   const storedTheme = typeof window !== 'undefined' ? localStorage.getItem('mimou_bookism_section') : ''
-  const theme = location.pathname.startsWith('/mangas') ? 'manga' : location.pathname.startsWith('/livres') || location.pathname.startsWith('/catalogue') ? 'books' : location.pathname.startsWith('/read/') && storedTheme === 'manga' ? 'manga' : location.pathname.startsWith('/read/') && storedTheme === 'books' ? 'books' : 'home'
-  const avatar = theme === 'manga' ? '🎴' : theme === 'books' ? '📖' : '🤖'
-  const title = theme === 'manga' ? 'Lia Manga' : theme === 'books' ? 'Lia Lecture' : 'Lia'
-  const subtitle = theme === 'manga' ? 'Compagne de ta mangathèque' : theme === 'books' ? 'Gardienne de ta bibliothèque' : 'Intelligence de MIMOU BOOKISM'
+  const isAdmin = location.pathname.startsWith('/admin')
+  const theme = isAdmin ? 'admin' : location.pathname.startsWith('/mangas') ? 'manga' : location.pathname.startsWith('/livres') || location.pathname.startsWith('/catalogue') ? 'books' : location.pathname.startsWith('/read/') && storedTheme === 'manga' ? 'manga' : location.pathname.startsWith('/read/') && storedTheme === 'books' ? 'books' : 'home'
+  const avatar = theme === 'manga' ? '🎴' : theme === 'books' ? '📖' : theme === 'admin' ? '👩🏻' : '🤖'
+  const title = theme === 'manga' ? 'Lia Manga' : theme === 'books' ? 'Lia Lecture' : theme === 'admin' ? 'Lia — Assistance admin' : 'Lia'
+  const subtitle = theme === 'manga' ? 'Compagne de ta mangathèque' : theme === 'books' ? 'Gardienne de ta bibliothèque' : theme === 'admin' ? 'Besoin d’aide ? Je suis là.' : 'Intelligence de MIMOU BOOKISM'
 
   useEffect(() => {
     if (open) loadBooks()
@@ -119,8 +120,16 @@ export default function MimouIA() {
     }
   }
 
+  const adminGuide = isAdmin ? (
+    <div className="lia-admin-guide" aria-label="Lia vous aide dans l'administration">
+      <div className="lia-admin-person">👩🏻</div>
+      <div className="lia-admin-sign">TU AS BESOIN D’AIDE ?<br /><strong>CLIQUE SUR MOI !</strong></div>
+    </div>
+  ) : null
+
   return (
     <>
+      {adminGuide}
       <button type="button" onClick={() => setOpen((value) => !value)} className={`lia-toggle ${theme}`} style={buttonStyle} aria-label="Ouvrir Lia">
         {open ? '✕ Fermer Lia' : `${avatar} ${title}`}
       </button>
