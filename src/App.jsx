@@ -10,6 +10,7 @@ import Favoris from './pages/Favoris'
 import Decouvrir from './pages/Decouvrir'
 import Ameliorations from './pages/Ameliorations'
 import Dictionnaire from './pages/Dictionnaire'
+import AdminDictionnaire from './pages/AdminDictionnaire'
 import Publier from './pages/Publier'
 import Reader from './pages/Reader'
 import Ecrivain from './pages/Ecrivain'
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/publier" element={<Publier />} />
           <Route path="/ecrivain" element={<Ecrivain />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/dictionnaire" element={<AdminDictionnaire />} />
           <Route path="/read/:id" element={<Reader />} />
           <Route path="/lire/:id" element={<Reader />} />
           <Route path="*" element={<div className="state"><h1>404 - Page non trouvée</h1></div>} />
