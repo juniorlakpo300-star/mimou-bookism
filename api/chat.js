@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message } = req.body || {}
+    const { message, books = [] } = req.body || {}
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message manquant.' })
     }
@@ -14,7 +14,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Message vide.' })
     }
 
-    // Les salutations n'ont pas besoin d'un appel IA : réponse immédiate.
     const normalized = cleanMessage
       .toLowerCase()
       .normalize('NFD')
@@ -22,19 +21,28 @@ export default async function handler(req, res) {
       .replace(/[!?.,;:]+/g, '')
       .trim()
 
-    const greetings = new Set([
-      'bonjour', 'bonsoir', 'salut', 'hello', 'hey', 'coucou', 'bjr', 'slt'
-    ])
-
+    const greetings = new Set(['bonjour', 'bonsoir', 'salut', 'hello', 'hey', 'coucou', 'bjr', 'slt'])
     if (greetings.has(normalized)) {
-      return res.status(200).json({
-        reply: 'Bonjour 👋 ! Comment puis-je t’aider aujourd’hui ?'
-      })
+      return res.status(200).json({ reply: 'Bonjour 👋 ! Comment puis-je t’aider aujourd’hui ?' })
     }
+
+    const catalogue = Array.isArray(books)
+      ? books.slice(0, 100).map((book) => ({
+          id: book?.id || '',
+          title: book?.title || '',
+          author: book?.author || '',
+          category: book?.category || '',
+          description: book?.description || '',
+          cover_url: book?.cover_url || ''
+        }))
+      : []
+
+    const catalogueText = catalogue.length
+      ? `CATALOGUE ACTUEL DE MIMOU BOOKISM (${catalogue.length} livres) :\n${JSON.stringify(catalogue)}`
+      : 'CATALOGUE ACTUEL : aucun livre n’a été transmis.'
 
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      console.error('GEMINI_API_KEY absente.')
       return res.status(500).json({ error: 'La clé Gemini n’est pas configurée sur le serveur.' })
     }
 
@@ -46,20 +54,16 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: `Tu es Lia, l'assistante de MIMOU BOOKISM. Tu tutoies toujours l'utilisateur. Réponds uniquement en français. Sois naturelle, chaleureuse et concise. Pour une question simple, réponds en 1 à 3 phrases. Pour une recommandation, donne des suggestions utiles. N'invente jamais une information sur la plateforme ou les livres.`
+              text: `Tu es Lia, l’assistante de MIMOU BOOKISM. Tu tutoies toujours l’utilisateur et réponds uniquement en français. Tu connais le catalogue fourni ci-dessous. Utilise uniquement les informations de ce catalogue pour parler des livres disponibles. Si l’utilisateur demande une recommandation, choisis parmi les livres du catalogue et explique brièvement pourquoi. Si aucun livre ne correspond, dis-le honnêtement. Ne prétends jamais avoir lu le contenu intégral d’un livre si son contenu n’est pas fourni. Réponds naturellement et brièvement, généralement en 1 à 4 phrases.\n\n${catalogueText}`
             }]
           },
           contents: [{ role: 'user', parts: [{ text: cleanMessage }] }],
-          generationConfig: {
-            maxOutputTokens: 256,
-            temperature: 0.4
-          }
+          generationConfig: { maxOutputTokens: 300, temperature: 0.4 }
         })
       }
     )
 
     const data = await response.json().catch(() => ({}))
-
     if (!response.ok) {
       console.error('Erreur Gemini:', data)
       return res.status(response.status).json({
@@ -67,22 +71,18 @@ export default async function handler(req, res) {
       })
     }
 
-    const parts = data?.candidates?.[0]?.content?.parts || []
-    const reply = parts
-      .map(part => (typeof part?.text === 'string' ? part.text : ''))
+    const reply = (data?.candidates?.[0]?.content?.parts || [])
+      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
       .join('')
       .trim()
 
     if (!reply) {
-      console.error('Réponse Gemini vide:', JSON.stringify(data))
       return res.status(502).json({ error: 'Lia n’a pas reçu de réponse complète.' })
     }
 
     return res.status(200).json({ reply })
   } catch (error) {
     console.error('Erreur /api/chat:', error)
-    return res.status(500).json({
-      error: error?.message || 'Une erreur interne est survenue avec Lia.'
-    })
+    return res.status(500).json({ error: error?.message || 'Une erreur interne est survenue avec Lia.' })
   }
 }
