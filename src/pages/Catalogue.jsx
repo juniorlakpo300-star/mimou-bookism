@@ -12,37 +12,37 @@ export default function Catalogue() {
   const [category, setCategory] = useState('Toutes')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     async function fetchBooks() {
-      const { data, error } = await supabase.from('books').select('*')
+      const { data, error } = await supabase
+        .from('books')
+        .select('*')
+        .order('created_at', { ascending: false })
+
       if (error) setError(error.message)
       else setBooks(data || [])
       setLoading(false)
     }
+
     fetchBooks()
   }, [])
 
-  useEffect(() => {
-    async function checkAdmin() {
-      if (!user) {
-        setIsAdmin(false)
-        return
-      }
-      const { data } = await supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle()
-      setIsAdmin(Boolean(data))
-    }
-    checkAdmin()
-  }, [user])
-
-  const categories = useMemo(() => ['Toutes', ...new Set(books.map(b => b.category).filter(Boolean))], [books])
+  const categories = useMemo(() => {
+    return ['Toutes', ...new Set(books.map(book => book.category).filter(Boolean))]
+  }, [books])
 
   const filteredBooks = useMemo(() => {
     const q = search.trim().toLowerCase()
+
     return books.filter(book => {
-      const text = [book.title, book.author, book.description, book.category].filter(Boolean).join(' ').toLowerCase()
-      return (!q || text.includes(q)) && (category === 'Toutes' || book.category === category)
+      const text = [book.title, book.author, book.description, book.category]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return (!q || text.includes(q)) &&
+        (category === 'Toutes' || book.category === category)
     })
   }, [books, search, category])
 
@@ -58,12 +58,15 @@ export default function Catalogue() {
       <div className="container">
         <header className="header">
           <Link to="/" className="brand">MIMOU <span>BOOKISM</span></Link>
+
           <nav className="nav">
             <Link to="/catalogue" className="btn active">Catalogue</Link>
+
             {user ? (
               <>
                 <Link to="/ecrivain" className="btn">✍️ Espace écrivain</Link>
-                {isAdmin && <Link to="/admin" className="btn admin-btn">🛡️ Admin</Link>}
+                <Link to="/admin" className="btn admin-btn">🛡️ Admin</Link>
+                <Link to="/publier" className="btn primary">+ Publier</Link>
                 <span className="user-chip">👤 {user.email}</span>
                 <button onClick={handleLogout} className="btn">Déconnexion</button>
               </>
@@ -76,21 +79,36 @@ export default function Catalogue() {
           </nav>
         </header>
 
-        <section className="hero">
-          <p className="eyebrow">BIBLIOTHÈQUE NUMÉRIQUE</p>
-          <h1>Découvrez votre prochaine lecture.</h1>
-          <p>Explorez, lisez et téléchargez vos livres préférés sur MIMOU BOOKISM.</p>
-          {user && (
-            <div className="hero-actions">
-              <Link to="/publier" className="btn primary">+ Publier un livre</Link>
-              <Link to="/ecrivain" className="btn">Voir mes publications</Link>
-            </div>
-          )}
+        <section className="hero catalogue-hero">
+          <div className="hero-content">
+            <p className="eyebrow">BIBLIOTHÈQUE NUMÉRIQUE</p>
+            <h1>Découvrez votre prochaine lecture.</h1>
+            <p>Explorez, lisez et téléchargez vos livres préférés sur MIMOU BOOKISM.</p>
+
+            {user && (
+              <div className="hero-actions">
+                <Link to="/publier" className="btn primary">+ Publier un livre</Link>
+                <Link to="/ecrivain" className="btn">Voir mes publications</Link>
+              </div>
+            )}
+          </div>
+
+          <div className="hero-card">
+            <span>📚</span>
+            <strong>{books.length}</strong>
+            <small>livre{books.length > 1 ? 's' : ''} dans la collection</small>
+          </div>
         </section>
 
         <section className="filters">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un livre, un auteur..." aria-label="Rechercher" />
-          <select value={category} onChange={e => setCategory(e.target.value)} aria-label="Filtrer par catégorie">
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="🔎 Rechercher un livre, un auteur..."
+            aria-label="Rechercher"
+          />
+
+          <select value={category} onChange={e => setCategory(e.target.value)}>
             {categories.map(item => <option key={item}>{item}</option>)}
           </select>
         </section>
@@ -100,19 +118,32 @@ export default function Catalogue() {
             <p className="section-kicker">NOTRE COLLECTION</p>
             <h2>Livres disponibles</h2>
           </div>
-          <span className="result-count">{filteredBooks.length} livre{filteredBooks.length > 1 ? 's' : ''}</span>
+          <span className="result-count">
+            {filteredBooks.length} livre{filteredBooks.length > 1 ? 's' : ''}
+          </span>
         </div>
 
         {filteredBooks.length === 0 ? (
-          <div className="empty-card">Aucun livre ne correspond à votre recherche.</div>
+          <div className="empty-card">
+            <h2>Aucun livre trouvé</h2>
+            <p>Essayez une autre recherche ou une autre catégorie.</p>
+          </div>
         ) : (
           <section className="book-grid">
             {filteredBooks.map(book => (
               <Link key={book.id} to={`/read/${book.id}`} className="book-card">
                 <div className="cover-wrap">
-                  <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
-                  <span className={`book-status ${book.is_free ? 'free' : 'paid'}`}>{book.is_free ? 'Gratuit' : `${book.price || 0} FCFA`}</span>
+                  <img
+                    src={book.cover_url || FALLBACK_COVER}
+                    alt={`Couverture de ${book.title || 'livre'}`}
+                    className="book-cover"
+                    onError={e => { e.currentTarget.src = FALLBACK_COVER }}
+                  />
+                  <span className={`book-status ${book.is_free ? 'free' : 'paid'}`}>
+                    {book.is_free ? 'Gratuit' : `${book.price || 0} FCFA`}
+                  </span>
                 </div>
+
                 <div className="book-info">
                   <h2 className="book-title">{book.title || 'Sans titre'}</h2>
                   <p className="book-author">{book.author || 'Auteur inconnu'}</p>
