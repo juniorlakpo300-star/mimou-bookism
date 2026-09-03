@@ -8,6 +8,7 @@ const SECTION_KEY = 'mimou_bookism_section'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
+const BOOK_FIELDS = 'id,title,author,category,description,cover_url,file_path,file_url,book_url,is_free,price,views_count'
 
 function getFavorites() { try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] } }
 function getBookmarks() { try { return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || '{}') } catch { return {} } }
@@ -31,12 +32,17 @@ export default function Reader() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
+
     async function load() {
       const [{ data: bookData, error: bookError }, { data: commentData, error: commentError }, { data: ratingData, error: ratingError }] = await Promise.all([
-        supabase.from('books').select('*').eq('id', id).single(),
-        supabase.from('comments').select('*').eq('book_id', id).order('created_at', { ascending: false }),
+        supabase.from('books').select(BOOK_FIELDS).eq('id', id).single(),
+        supabase.from('comments').select('id,book_id,user_email,content,created_at').eq('book_id', id).order('created_at', { ascending: false }),
         supabase.from('book_ratings').select('rating').eq('book_id', id)
       ])
+
+      if (!active) return
+
       if (bookError) setError(bookError.message)
       else {
         setBook(bookData)
@@ -52,6 +58,7 @@ export default function Reader() {
         else if (bookData?.file_url || bookData?.book_url) setPdfUrl(bookData.file_url || bookData.book_url)
         else if (signedError) console.error('PDF:', signedError)
       }
+
       if (commentError) console.error(commentError)
       setComments(commentData || [])
       if (!ratingError) {
@@ -61,7 +68,9 @@ export default function Reader() {
       }
       setLoading(false)
     }
+
     load()
+    return () => { active = false }
   }, [id])
 
   async function addComment(event) {
@@ -108,7 +117,7 @@ export default function Reader() {
         <h1>{book.title}</h1>
         <p className="reader-author">{book.author || (isManga ? 'Mangaka inconnu' : 'Auteur inconnu')} {book.category ? `• ${book.category}` : ''} • {book.is_free ? 'Gratuit' : 'Premium'}</p>
         <div className="reader-meta-strip"><span>👁️ {Number(book.views_count || 0) + 1} lecture(s)</span><span>⭐ {averageRating ? averageRating.toFixed(1) : '—'} / 5 ({ratingCount})</span></div>
-        <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+        <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} decoding="async" />
         {book.description && <p className="reader-description">{book.description}</p>}
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
         <div className="reader-actions">
