@@ -9,7 +9,7 @@ export default function MimouIA() {
     {
       role: 'assistant',
       content:
-        'Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre.'
+        "Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre."
     }
   ])
   const [loading, setLoading] = useState(false)
@@ -24,7 +24,7 @@ export default function MimouIA() {
     setSearchLoading(true)
     setBooks([])
 
-    const safeQuery = text.replace(/[%_,]/g, ' ')
+    const safeQuery = text.slice(0, 120).replace(/[%_,]/g, ' ')
 
     const { data, error: searchError } = await supabase
       .from('books')
@@ -69,67 +69,25 @@ export default function MimouIA() {
         body: JSON.stringify({ message: text })
       })
 
+      const data = await response.json().catch(() => ({}))
+
       if (!response.ok) {
-        const raw = await response.text()
-        let data = {}
-        try {
-          data = raw ? JSON.parse(raw) : {}
-        } catch {
-          // Réponse non JSON.
-        }
         throw new Error(data.error || `Erreur du service IA (${response.status}).`)
       }
 
-      if (!response.body) {
-        throw new Error('Le serveur n’a pas fourni de flux de réponse.')
-      }
+      const reply = typeof data.reply === 'string' ? data.reply.trim() : ''
 
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
-      let buffer = ''
-      let fullReply = ''
-
-      while (true) {
-        const { value, done } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const events = buffer.split('\n\n')
-        buffer = events.pop() || ''
-
-        for (const event of events) {
-          const line = event
-            .split('\n')
-            .find(item => item.startsWith('data:'))
-
-          if (!line) continue
-
-          const jsonText = line.slice(5).trim()
-          if (!jsonText || jsonText === '[DONE]') continue
-
-          try {
-            const data = JSON.parse(jsonText)
-            const chunk = data?.text || ''
-            if (!chunk) continue
-
-            fullReply += chunk
-
-            setMessages(prev =>
-              prev.map((item, index) =>
-                index === assistantIndex
-                  ? { ...item, content: fullReply }
-                  : item
-              )
-            )
-          } catch {
-            // On ignore un événement incomplet ou invalide.
-          }
-        }
-      }
-
-      if (!fullReply.trim()) {
+      if (!reply) {
         throw new Error('Lia n’a reçu aucune réponse du service IA.')
       }
+
+      setMessages(prev =>
+        prev.map((item, index) =>
+          index === assistantIndex
+            ? { ...item, content: reply }
+            : item
+        )
+      )
 
       setLoading(false)
 
