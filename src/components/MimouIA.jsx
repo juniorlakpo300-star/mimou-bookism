@@ -121,9 +121,11 @@ export default function MimouIA() {
   }
 
   const adminGuide = isAdmin ? (
-    <div className="lia-admin-guide" aria-label="Lia vous aide dans l'administration">
-      <div className="lia-admin-person">👩🏻</div>
-      <div className="lia-admin-sign">TU AS BESOIN D’AIDE ?<br /><strong>CLIQUE SUR MOI !</strong></div>
+    <div className="lia-admin-guide" aria-label="Lia vous aide dans l'administration" style={{ position: 'fixed', right: '28px', bottom: '92px', zIndex: 99997, display: 'flex', alignItems: 'flex-end', gap: '10px', pointerEvents: 'none', animation: 'liaGuideFloat 3s ease-in-out infinite' }}>
+      <div className="lia-admin-person" style={{ fontSize: '76px', lineHeight: 1, filter: 'drop-shadow(0 12px 20px rgba(0,0,0,.35))' }}>👩🏻</div>
+      <div className="lia-admin-sign" style={{ pointerEvents: 'auto', cursor: 'pointer', padding: '13px 17px', borderRadius: '14px', border: '3px solid #f8fafc', background: 'linear-gradient(145deg,#7c3aed,#ec4899)', color: '#fff', fontSize: '12px', lineHeight: 1.35, fontWeight: 900, letterSpacing: '.7px', textAlign: 'center', boxShadow: '0 12px 30px rgba(124,58,237,.35)', transform: 'rotate(-3deg)', minWidth: '150px' }} onClick={() => setOpen(true)}>
+        TU AS BESOIN D’AIDE ?<br /><strong style={{ fontSize: '15px' }}>CLIQUE SUR MOI !</strong>
+      </div>
     </div>
   ) : null
 
