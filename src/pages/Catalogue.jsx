@@ -65,7 +65,6 @@ export default function Catalogue() {
             {user ? (
               <>
                 <Link to="/ecrivain" className="btn">✍️ Espace écrivain</Link>
-                <Link to="/admin" className="btn admin-btn">🛡️ Admin</Link>
                 <Link to="/publier" className="btn primary">+ Publier</Link>
                 <span className="user-chip">👤 {user.email}</span>
                 <button onClick={handleLogout} className="btn">Déconnexion</button>
