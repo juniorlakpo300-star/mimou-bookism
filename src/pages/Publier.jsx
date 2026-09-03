@@ -11,9 +11,28 @@ const MANGA_CATEGORIES = [
   'Shōnen','Shōjo','Seinen','Josei','Kodomo','Isekai','Action','Aventure','Comédie','Drame','Fantastique','Fantasy','Horreur','Mystère','Romance','Science-fiction','Sport','Historique','Arts martiaux','Slice of life','Autre'
 ]
 
+async function uploadThroughServer(bucket, path, file) {
+  const response = await fetch('/api/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bucket, path })
+  })
+
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload.error || `Impossible de préparer l'envoi de ${file.name}.`)
+
+  const { error } = await supabase.storage
+    .from(bucket)
+    .uploadToSignedUrl(payload.path, payload.token, file)
+
+  if (error) throw new Error(`Erreur d'envoi de ${file.name} : ${error.message}`)
+  return payload.url
+}
+
 export default function Publier() {
   const { user, loading: authLoading } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [progress, setProgress] = useState('')
   const [type, setType] = useState('livre')
   const navigate = useNavigate()
 
@@ -23,8 +42,12 @@ export default function Publier() {
 
   async function handleSubmit(event) {
     event.preventDefault()
-    if (!user) return
+    if (!user || loading) return
     setLoading(true)
+    setProgress('Vérification des fichiers...')
+
+    let coverPath = null
+    let pdfPath = null
 
     try {
       const form = event.currentTarget
@@ -32,39 +55,32 @@ export default function Publier() {
       const author = form.author.value.trim() || (type === 'manga' ? 'Mangaka inconnu' : 'Auteur inconnu')
       const category = form.category.value
       const description = form.description.value.trim()
-      const volume = form.volume.value.trim()
+      const volume = form.volume?.value.trim() || ''
       const cover = form.cover.files[0]
       const pdf = form.pdf.files[0]
 
       if (!title) throw new Error(`Indique le titre du ${type === 'manga' ? 'manga' : 'livre'}.`)
       if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
-      if (pdf.type !== 'application/pdf' && !pdf.name.toLowerCase().endsWith('.pdf')) {
-        throw new Error('Le fichier doit être un PDF.')
-      }
+      if (!cover.type.startsWith('image/')) throw new Error('La couverture doit être une image.')
+      if (pdf.type !== 'application/pdf' && !pdf.name.toLowerCase().endsWith('.pdf')) throw new Error('Le fichier doit être un PDF.')
 
       const id = crypto.randomUUID()
       const coverExt = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
-      const coverPath = `${id}.${coverExt}`
-      const pdfPath = `${id}.pdf`
+      coverPath = `${user.id}/${id}.${coverExt}`
+      pdfPath = `${user.id}/${id}.pdf`
 
-      const { error: coverError } = await supabase.storage.from('covers').upload(coverPath, cover, { upsert: false })
-      if (coverError) throw new Error(`Erreur couverture : ${coverError.message}`)
+      setProgress('Envoi de la couverture...')
+      const coverUrl = await uploadThroughServer('covers', coverPath, cover)
 
-      const { error: pdfError } = await supabase.storage.from('books').upload(pdfPath, pdf, {
-        contentType: 'application/pdf', cacheControl: '3600', upsert: false
-      })
-      if (pdfError) {
-        await supabase.storage.from('covers').remove([coverPath])
-        throw new Error(`Erreur PDF : ${pdfError.message}. Vérifie le bucket « books » et ses permissions Supabase.`)
-      }
-
-      const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
+      setProgress('Envoi du PDF...')
+      const pdfUrl = await uploadThroughServer('books', pdfPath, pdf)
 
       const finalCategory = type === 'manga' ? `Manga • ${category}` : category
       const finalDescription = volume
         ? `${volume}${description ? `\n\n${description}` : ''}`
         : description
 
+      setProgress('Enregistrement du livre...')
       const { error: insertError } = await supabase.from('books').insert({
         id,
         owner_id: user.id,
@@ -74,22 +90,25 @@ export default function Publier() {
         description: finalDescription || null,
         price: 0,
         is_free: true,
-        cover_url: coverData.publicUrl,
+        cover_url: coverUrl,
+        file_url: pdfUrl,
         file_path: pdfPath
       })
 
-      if (insertError) {
-        await supabase.storage.from('books').remove([pdfPath])
-        await supabase.storage.from('covers').remove([coverPath])
-        throw new Error(`${type === 'manga' ? 'Manga' : 'Livre'} non enregistré : ${insertError.message}`)
-      }
+      if (insertError) throw new Error(`Fichier envoyé, mais livre non enregistré : ${insertError.message}`)
 
       alert(`✅ ${type === 'manga' ? 'Manga' : 'Livre'} publié avec succès !`)
       navigate(`/read/${id}`)
     } catch (err) {
-      console.error(err)
-      alert(`Erreur : ${err.message || 'Une erreur est survenue.'}`)
+      console.error('Publication:', err)
+
+      // Nettoyage des fichiers si l'enregistrement en base échoue.
+      if (pdfPath) await supabase.storage.from('books').remove([pdfPath]).catch(() => {})
+      if (coverPath) await supabase.storage.from('covers').remove([coverPath]).catch(() => {})
+
+      alert(`Erreur : ${err?.message || 'Une erreur est survenue pendant la publication.'}`)
     } finally {
+      setProgress('')
       setLoading(false)
     }
   }
@@ -131,6 +150,7 @@ export default function Publier() {
           <label className="field"><span>Couverture *</span><input name="cover" type="file" accept="image/*" required /></label>
           <label className="field"><span>Fichier PDF *</span><input name="pdf" type="file" accept="application/pdf,.pdf" required /></label>
 
+          {progress && <p className="notice">⏳ {progress}</p>}
           <button className="btn primary full" type="submit" disabled={loading}>{loading ? 'Publication en cours...' : `Publier le ${type === 'manga' ? 'manga' : 'livre'}`}</button>
         </form>
       </div>
