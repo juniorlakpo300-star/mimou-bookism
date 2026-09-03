@@ -3,6 +3,8 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../AuthContext.jsx'
 
+const PUBLIC_SITE_URL = 'https://mimou-bookism-hz66pjgau-mimou.vercel.app/'
+
 export default function Home() {
   const { user } = useAuth()
   const [shared, setShared] = useState(false)
@@ -11,21 +13,21 @@ export default function Home() {
     const shareData = {
       title: 'MIMOU BOOKISM',
       text: 'Découvre MIMOU BOOKISM, ta bibliothèque numérique.',
-      url: window.location.origin,
+      url: PUBLIC_SITE_URL,
     }
 
     try {
       if (navigator.share) {
         await navigator.share(shareData)
       } else {
-        await navigator.clipboard.writeText(shareData.url)
+        await navigator.clipboard.writeText(PUBLIC_SITE_URL)
         setShared(true)
         setTimeout(() => setShared(false), 2500)
       }
     } catch (error) {
       if (error?.name !== 'AbortError') {
         try {
-          await navigator.clipboard.writeText(shareData.url)
+          await navigator.clipboard.writeText(PUBLIC_SITE_URL)
           setShared(true)
           setTimeout(() => setShared(false), 2500)
         } catch {
