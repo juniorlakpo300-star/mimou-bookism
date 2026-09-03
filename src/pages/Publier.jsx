@@ -11,10 +11,13 @@ const MANGA_CATEGORIES = [
   'Shōnen','Shōjo','Seinen','Josei','Kodomo','Isekai','Action','Aventure','Comédie','Drame','Fantastique','Fantasy','Horreur','Mystère','Romance','Science-fiction','Sport','Historique','Arts martiaux','Slice of life','Autre'
 ]
 
-async function uploadThroughServer(bucket, path, file) {
+async function uploadThroughServer(bucket, path, file, accessToken) {
   const response = await fetch('/api/upload-url', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`
+    },
     body: JSON.stringify({ bucket, path })
   })
 
@@ -51,18 +54,30 @@ export default function Publier() {
 
     try {
       const form = event.currentTarget
-      const title = form.title.value.trim()
-      const author = form.author.value.trim() || (type === 'manga' ? 'Mangaka inconnu' : 'Auteur inconnu')
-      const category = form.category.value
-      const description = form.description.value.trim()
-      const volume = form.volume?.value.trim() || ''
-      const cover = form.cover.files[0]
-      const pdf = form.pdf.files[0]
+      const data = new FormData(form)
+
+      // FormData évite les erreurs du type "reading 'value'" sur les champs du formulaire.
+      const title = String(data.get('title') || '').trim()
+      const authorValue = String(data.get('author') || '').trim()
+      const category = String(data.get('category') || '')
+      const description = String(data.get('description') || '').trim()
+      const volume = String(data.get('volume') || '').trim()
+      const cover = data.get('cover')
+      const pdf = data.get('pdf')
+
+      const author = authorValue || (type === 'manga' ? 'Mangaka inconnu' : 'Auteur inconnu')
 
       if (!title) throw new Error(`Indique le titre du ${type === 'manga' ? 'manga' : 'livre'}.`)
-      if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
+      if (!cover || !(cover instanceof File) || !cover.name) throw new Error('Choisis une couverture.')
+      if (!pdf || !(pdf instanceof File) || !pdf.name) throw new Error('Choisis un fichier PDF.')
       if (!cover.type.startsWith('image/')) throw new Error('La couverture doit être une image.')
       if (pdf.type !== 'application/pdf' && !pdf.name.toLowerCase().endsWith('.pdf')) throw new Error('Le fichier doit être un PDF.')
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) throw new Error('Impossible de vérifier ta session.')
+
+      const accessToken = sessionData?.session?.access_token
+      if (!accessToken) throw new Error('Session expirée. Reconnecte-toi puis réessaie.')
 
       const id = crypto.randomUUID()
       const coverExt = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -70,10 +85,10 @@ export default function Publier() {
       pdfPath = `${user.id}/${id}.pdf`
 
       setProgress('Envoi de la couverture...')
-      const coverUrl = await uploadThroughServer('covers', coverPath, cover)
+      const coverUrl = await uploadThroughServer('covers', coverPath, cover, accessToken)
 
       setProgress('Envoi du PDF...')
-      const pdfUrl = await uploadThroughServer('books', pdfPath, pdf)
+      const pdfUrl = await uploadThroughServer('books', pdfPath, pdf, accessToken)
 
       const finalCategory = type === 'manga' ? `Manga • ${category}` : category
       const finalDescription = volume
@@ -102,7 +117,6 @@ export default function Publier() {
     } catch (err) {
       console.error('Publication:', err)
 
-      // Nettoyage des fichiers si l'enregistrement en base échoue.
       if (pdfPath) await supabase.storage.from('books').remove([pdfPath]).catch(() => {})
       if (coverPath) await supabase.storage.from('covers').remove([coverPath]).catch(() => {})
 
