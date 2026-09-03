@@ -14,8 +14,8 @@ export default function Ecrivain() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!authLoading && !user) navigate('/connexion', { replace: true })
-  }, [authLoading, user, navigate])
+    if (!authLoading && !user) navigate('/admin', { replace: true })
+  }, [user, authLoading, navigate])
 
   useEffect(() => {
     if (!user) return
@@ -23,19 +23,11 @@ export default function Ecrivain() {
     async function loadBooks() {
       setLoading(true)
       setError('')
-
-      const { data, error: queryError } = await supabase
-        .from('books')
-        .select('*')
-        .eq('owner_id', user.id)
-        .order('created_at', { ascending: false })
-
+      const { data, error: queryError } = await supabase.from('books').select('*').eq('owner_id', user.id).order('created_at', { ascending: false })
       if (queryError) setError(queryError.message)
       else setBooks(data || [])
-
       setLoading(false)
     }
-
     loadBooks()
   }, [user])
 
@@ -48,37 +40,16 @@ export default function Ecrivain() {
   }
 
   async function deleteBook(book) {
-    const confirmed = window.confirm(
-      `Supprimer « ${book.title || 'ce livre'} » ?\n\nCette action est définitive.`
-    )
-
-    if (!confirmed) return
-
+    if (!window.confirm(`Supprimer « ${book.title || 'ce livre'} » ?\n\nCette action est définitive.`)) return
     setDeleting(book.id)
     setError('')
-
     try {
       const coverPath = getStoragePath(book.cover_url, 'covers')
-      const filePath = getStoragePath(book.file_url || book.book_url, 'books')
-
-      if (coverPath) {
-        const { error } = await supabase.storage.from('covers').remove([coverPath])
-        if (error) console.warn('Image non supprimée :', error.message)
-      }
-
-      if (filePath) {
-        const { error } = await supabase.storage.from('books').remove([filePath])
-        if (error) console.warn('PDF non supprimé :', error.message)
-      }
-
-      const { error: deleteError } = await supabase
-        .from('books')
-        .delete()
-        .eq('id', book.id)
-        .eq('owner_id', user.id)
-
+      const filePath = book.file_path || getStoragePath(book.file_url || book.book_url, 'books')
+      if (coverPath) await supabase.storage.from('covers').remove([coverPath])
+      if (filePath) await supabase.storage.from('books').remove([filePath])
+      const { error: deleteError } = await supabase.from('books').delete().eq('id', book.id).eq('owner_id', user.id)
       if (deleteError) throw deleteError
-
       setBooks(current => current.filter(item => item.id !== book.id))
     } catch (err) {
       setError(err.message || 'Impossible de supprimer le livre.')
@@ -87,18 +58,14 @@ export default function Ecrivain() {
     }
   }
 
-  if (authLoading || loading) {
-    return <div className="state">Chargement de votre espace écrivain...</div>
-  }
-
+  if (authLoading || loading) return <div className="state">Chargement de votre espace écrivain...</div>
   if (!user) return null
 
   return (
     <main className="page">
       <div className="container">
         <header className="header">
-          <Link to="/catalogue" className="brand">MIMOU <span>BOOKISM</span></Link>
-
+          <Link to="/admin" className="brand">MIMOU <span>BOOKISM</span></Link>
           <nav className="nav">
             <Link to="/catalogue" className="btn">Catalogue</Link>
             <Link to="/publier" className="btn primary">+ Publier</Link>
@@ -107,14 +74,11 @@ export default function Ecrivain() {
 
         <section className="dashboard-hero">
           <div>
-            <p className="eyebrow">ESPACE ÉCRIVAIN</p>
+            <p className="eyebrow">ESPACE ADMINISTRATEUR</p>
             <h1>Mes publications</h1>
-            <p>Retrouvez ici uniquement les livres publiés avec votre compte.</p>
+            <p>Retrouvez ici les livres publiés avec le compte administrateur.</p>
           </div>
-          <div className="writer-stat">
-            <strong>{books.length}</strong>
-            <span>publication{books.length > 1 ? 's' : ''}</span>
-          </div>
+          <div className="writer-stat"><strong>{books.length}</strong><span>publication{books.length > 1 ? 's' : ''}</span></div>
         </section>
 
         {error && <div className="notice error-box">{error}</div>}
@@ -123,41 +87,24 @@ export default function Ecrivain() {
           <div className="empty-card">
             <div className="empty-icon">📚</div>
             <h2>Aucune publication trouvée</h2>
-            <p>Les livres que vous publierez avec ce compte apparaîtront ici.</p>
-            <Link to="/publier" className="btn primary">Publier mon premier livre</Link>
+            <p>Les livres publiés avec le compte administrateur apparaîtront ici.</p>
+            <Link to="/publier" className="btn primary">Publier un livre</Link>
           </div>
         ) : (
           <section className="writer-grid">
             {books.map(book => (
               <article className="writer-card" key={book.id}>
-                <img
-                  src={book.cover_url || FALLBACK_COVER}
-                  alt={`Couverture de ${book.title || 'livre'}`}
-                  className="writer-cover"
-                  onError={e => { e.currentTarget.src = FALLBACK_COVER }}
-                />
-
+                <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title || 'livre'}`} className="writer-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
                 <div className="writer-content">
                   <div className="writer-meta">
                     <span className="badge">{book.category || 'Sans catégorie'}</span>
-                    <span className={book.is_free ? 'price free-text' : 'price'}>
-                      {book.is_free ? 'Gratuit' : `${book.price || 0} FCFA`}
-                    </span>
+                    <span className={book.is_free ? 'price free-text' : 'price'}>{book.is_free ? 'Gratuit' : `${book.price || 0} FCFA`}</span>
                   </div>
-
                   <h2>{book.title || 'Sans titre'}</h2>
                   <p>{book.author || 'Auteur inconnu'}</p>
-
                   <div className="writer-actions">
                     <Link to={`/read/${book.id}`} className="btn">Voir le livre</Link>
-                    <button
-                      type="button"
-                      className="btn danger"
-                      onClick={() => deleteBook(book)}
-                      disabled={deleting === book.id}
-                    >
-                      {deleting === book.id ? 'Suppression...' : '🗑️ Supprimer'}
-                    </button>
+                    <button type="button" className="btn danger" onClick={() => deleteBook(book)} disabled={deleting === book.id}>{deleting === book.id ? 'Suppression...' : '🗑️ Supprimer'}</button>
                   </div>
                 </div>
               </article>
