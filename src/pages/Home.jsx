@@ -1,15 +1,48 @@
 import '../landing.css'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../AuthContext.jsx'
 
 export default function Home() {
   const { user } = useAuth()
+  const [shared, setShared] = useState(false)
+
+  const shareSite = async () => {
+    const shareData = {
+      title: 'MIMOU BOOKISM',
+      text: 'Découvre MIMOU BOOKISM, ta bibliothèque numérique.',
+      url: window.location.origin,
+    }
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData)
+      } else {
+        await navigator.clipboard.writeText(shareData.url)
+        setShared(true)
+        setTimeout(() => setShared(false), 2500)
+      }
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        try {
+          await navigator.clipboard.writeText(shareData.url)
+          setShared(true)
+          setTimeout(() => setShared(false), 2500)
+        } catch {
+          setShared(false)
+        }
+      }
+    }
+  }
 
   return (
     <main className="landing-page">
       <header className="landing-header">
         <Link to="/" className="landing-brand">MIMOU <span>BOOKISM</span></Link>
-        <Link to="/admin" className="btn admin-btn">🛠️ Admin</Link>
+        <div className="landing-header-actions">
+          <button type="button" className="share-site-btn" onClick={shareSite}>🔗 {shared ? 'Lien copié !' : 'Partager le site'}</button>
+          <Link to="/admin" className="btn admin-btn">🛠️ Admin</Link>
+        </div>
       </header>
 
       <section className="landing-hero">
