@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Catalogue from './pages/Catalogue'
 import Publier from './pages/Publier'
 import Reader from './pages/Reader'
-import Paiement from './pages/Paiement'
 import Connexion from './pages/Connexion'
 import Inscription from './pages/Inscription'
 import Ecrivain from './pages/Ecrivain'
@@ -25,7 +24,6 @@ export default function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/read/:id" element={<Reader />} />
           <Route path="/lire/:id" element={<Reader />} />
-          <Route path="/paiement" element={<Paiement />} />
           <Route path="/connexion" element={<Connexion />} />
           <Route path="/inscription" element={<Inscription />} />
 
@@ -39,7 +37,6 @@ export default function App() {
           />
         </Routes>
 
-        {/* Assistante Lia */}
         <MimouIA />
       </BrowserRouter>
     </AuthProvider>
