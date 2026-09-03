@@ -31,6 +31,7 @@ export default function Home() {
           <span className="brand-wordmark">MIMOU <b>BOOKISM</b></span>
         </Link>
         <div className="landing-header-actions">
+          <Link to="/dictionnaire" className="share-site-btn home-discover-link">📖 Dictionnaire</Link>
           <Link to="/decouvrir" className="share-site-btn home-discover-link">🔥 Découvrir</Link>
           <button type="button" className="share-site-btn" onClick={shareSite}>↗ Partager</button>
           <Link to="/admin" className="btn admin-btn">⚙ Admin</Link>
