@@ -29,7 +29,7 @@ function normalizeEntry(item) {
   const word = String(item?.word || '').trim()
   const definition = String(item?.definition || '').trim()
   if (!word || !definition) return null
-  return { word, type: 'Français', definition, example: '', tags: ['Français', item?.pos || ''] .filter(Boolean) }
+  return { word, type: 'Français', definition, example: '', tags: ['Français', item?.pos || ''].filter(Boolean) }
 }
 
 export default function Dictionnaire() {
@@ -49,16 +49,13 @@ export default function Dictionnaire() {
       ])
 
       let combined = []
-      if (supabaseResult.status === 'fulfilled' && !supabaseResult.value.error && Array.isArray(supabaseResult.value.data)) {
-        combined = supabaseResult.value.data
-      }
+      if (supabaseResult.status === 'fulfilled' && !supabaseResult.value.error && Array.isArray(supabaseResult.value.data)) combined = supabaseResult.value.data
 
       const existing = new Set(combined.map(item => String(item.word || '').toLocaleLowerCase('fr-FR')))
 
       try {
-        // Import progressif d’un vrai corpus français dérivé de Wiktionary.
-        // On s’arrête dès que 10 000 entrées utilisables sont chargées afin d’éviter
-        // de télécharger inutilement toute la base qui contient beaucoup plus d’entrées.
+        // Corpus français dérivé de Wiktionary. On charge les lettres progressivement
+        // et on s’arrête dès que le catalogue atteint 10 000 entrées utilisables.
         for (const letter of LETTERS) {
           if (!active || combined.length >= TARGET_WORDS) break
           const response = await fetch(`${FRENCH_DATA_URL}/${letter}.json`)
@@ -78,10 +75,10 @@ export default function Dictionnaire() {
         }
 
         if (active) {
-          setEntries(combined.length >= TARGET_WORDS ? combined : [...combined, ...FALLBACK_ENTRIES.filter(item => !existing.has(item.word.toLocaleLowerCase('fr-FR')))])
-          if (combined.length < TARGET_WORDS) setDictionaryError(`Le corpus distant a fourni ${combined.length} entrées disponibles pour le moment.`)
+          setEntries(combined.length ? combined : FALLBACK_ENTRIES)
+          if (combined.length < TARGET_WORDS) setDictionaryError(`Le corpus a fourni ${combined.length.toLocaleString('fr-FR')} entrées utilisables pour le moment.`)
         }
-      } catch (error) {
+      } catch {
         if (active) {
           setDictionaryError('Le grand corpus français n’a pas pu être chargé. Les entrées enregistrées dans MIMOU restent disponibles.')
           setEntries(combined.length ? combined : FALLBACK_ENTRIES)
@@ -162,7 +159,7 @@ export default function Dictionnaire() {
         <Link to="/mangas" className="btn primary">Retourner aux mangas →</Link>
       </section>
 
-      <footer className="home-footer-v2"><Link to="/" className="footer-brand-v2">MIMOU <span>BOOKISM</span></Link><span>Lire · Comprendre · Imaginer · Transmettre</span><Link to="/admin" className="footer-admin">Espace administration →</Link></footer>
+      <footer className="home-footer-v2"><Link to="/" className="footer-brand-v2">MIMOU <span>BOOKISM</span></Link><span>Lire · Comprendre · Imaginer · Transmettre</span><small className="dictionary-attribution">Données lexicales françaises : Wiktionary, via le projet Wikitionary Dictionary JSON · CC BY-SA 3.0</small><Link to="/admin" className="footer-admin">Espace administration →</Link></footer>
 
       {selected && (
         <div className="dictionary-modal-backdrop" role="presentation" onClick={() => setSelected(null)}>
