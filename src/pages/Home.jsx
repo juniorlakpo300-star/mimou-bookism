@@ -1,18 +1,24 @@
 import '../landing.css'
 import { Link } from 'react-router-dom'
 
-const PUBLIC_SITE_URL = 'https://mimou-bookism-hz66pjgau-mimou.vercel.app/'
 const WHATSAPP_URL = 'https://wa.me/2250566111378?text=Bonjour%20MIMOU%20BOOKISM%2C%20je%20souhaite%20publier%20mon%20livre%20ou%20mon%20manga%20sur%20le%20site.'
 
 export default function Home() {
   const shareSite = async () => {
-    const shareData = { title: 'MIMOU BOOKISM', text: 'Découvre MIMOU BOOKISM, ta bibliothèque numérique.', url: PUBLIC_SITE_URL }
+    const publicSiteUrl = `${window.location.origin}/`
+    const shareData = { title: 'MIMOU BOOKISM', text: 'Découvre MIMOU BOOKISM, ta bibliothèque numérique.', url: publicSiteUrl }
     try {
       if (navigator.share) await navigator.share(shareData)
-      else { await navigator.clipboard.writeText(PUBLIC_SITE_URL); alert('Lien du site copié !') }
+      else {
+        await navigator.clipboard.writeText(publicSiteUrl)
+        alert('Lien du site copié !')
+      }
     } catch (error) {
       if (error?.name !== 'AbortError') {
-        try { await navigator.clipboard.writeText(PUBLIC_SITE_URL); alert('Lien du site copié !') } catch {}
+        try {
+          await navigator.clipboard.writeText(publicSiteUrl)
+          alert('Lien du site copié !')
+        } catch {}
       }
     }
   }
