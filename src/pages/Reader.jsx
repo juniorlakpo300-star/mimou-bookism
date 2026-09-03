@@ -28,8 +28,6 @@ export default function Reader() {
       } else {
         setBook(bookData)
 
-        // Les PDF sont stockés dans le bucket privé « books ».
-        // On crée une URL signée à partir de file_path.
         const filePath = bookData?.file_path || `${bookData?.id || id}.pdf`
         const { data: signedData, error: signedError } = await supabase.storage
           .from('books')
@@ -38,7 +36,6 @@ export default function Reader() {
         if (!signedError && signedData?.signedUrl) {
           setPdfUrl(signedData.signedUrl)
         } else if (bookData?.file_url || bookData?.book_url) {
-          // Compatibilité avec les anciens livres déjà enregistrés.
           setPdfUrl(bookData.file_url || bookData.book_url)
         } else {
           setPdfUrl('')
@@ -64,17 +61,14 @@ export default function Reader() {
       alert('Ton pseudo doit contenir au moins 2 caractères.')
       return
     }
-
     if (cleanPseudo.length > 30) {
       alert('Ton pseudo ne peut pas dépasser 30 caractères.')
       return
     }
-
     if (!content) {
       alert('Écris un commentaire avant de publier.')
       return
     }
-
     if (content.length > 2000) {
       alert('Le commentaire ne peut pas dépasser 2000 caractères.')
       return
@@ -102,16 +96,21 @@ export default function Reader() {
 
   if (loading) return <div className="state">Chargement...</div>
   if (error && !book) return <div className="state error">Erreur : {error}</div>
-  if (!book) return <div className="state">Livre introuvable.</div>
+  if (!book) return <div className="state">Œuvre introuvable.</div>
+
+  const isManga = String(book.category || '').toLowerCase().startsWith('manga •')
+  const theme = isManga ? 'manga-reader' : 'books-reader'
+  const backPath = isManga ? '/mangas' : '/livres'
+  const typeLabel = isManga ? 'Manga' : 'Livre'
 
   return (
-    <main className="reader">
+    <main className={`reader ${theme}`}>
       <div className="reader-card">
-        <Link to="/catalogue" className="btn">← Catalogue</Link>
+        <Link to={backPath} className="btn">← {isManga ? 'Mangathèque' : 'Bibliothèque'}</Link>
 
         <h1>{book.title}</h1>
         <p className="reader-author">
-          {book.author || 'Auteur inconnu'} {book.category ? `• ${book.category}` : ''} • Gratuit
+          {book.author || (isManga ? 'Mangaka inconnu' : 'Auteur inconnu')} {book.category ? `• ${book.category}` : ''} • Gratuit
         </p>
 
         <img
@@ -128,7 +127,7 @@ export default function Reader() {
         <div className="reader-actions">
           {pdfUrl ? (
             <>
-              <a className="btn primary" href={pdfUrl} target="_blank" rel="noreferrer">📖 Lire le PDF</a>
+              <a className="btn primary" href={pdfUrl} target="_blank" rel="noreferrer">📖 Lire le {typeLabel}</a>
               <a className="btn" href={pdfUrl} download>Télécharger</a>
             </>
           ) : (
@@ -137,11 +136,7 @@ export default function Reader() {
         </div>
 
         {pdfUrl && (
-          <iframe
-            className="pdf-frame"
-            src={pdfUrl}
-            title={`Lecture de ${book.title}`}
-          />
+          <iframe className="pdf-frame" src={pdfUrl} title={`Lecture de ${book.title}`} />
         )}
 
         <section className="comments">
@@ -150,28 +145,10 @@ export default function Reader() {
 
           <form onSubmit={addComment} className="comment-form">
             <label htmlFor="comment-pseudo">Votre pseudo</label>
-            <input
-              id="comment-pseudo"
-              type="text"
-              value={pseudo}
-              onChange={e => setPseudo(e.target.value)}
-              placeholder="Ex. Junior, Lecteur2026..."
-              minLength="2"
-              maxLength="30"
-              autoComplete="nickname"
-              required
-            />
+            <input id="comment-pseudo" type="text" value={pseudo} onChange={e => setPseudo(e.target.value)} placeholder="Ex. Junior, Lecteur2026..." minLength="2" maxLength="30" autoComplete="nickname" required />
 
             <label htmlFor="comment-content">Votre commentaire</label>
-            <textarea
-              id="comment-content"
-              value={comment}
-              onChange={e => setComment(e.target.value)}
-              placeholder="Écris ton commentaire sur ce livre..."
-              rows="4"
-              maxLength="2000"
-              required
-            />
+            <textarea id="comment-content" value={comment} onChange={e => setComment(e.target.value)} placeholder={`Écris ton commentaire sur ce ${isManga ? 'manga' : 'livre'}...`} rows="4" maxLength="2000" required />
 
             <button type="submit" className="btn primary" disabled={sending}>
               {sending ? 'Publication...' : '💬 Publier le commentaire'}
