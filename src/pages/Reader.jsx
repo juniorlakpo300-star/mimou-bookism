@@ -10,6 +10,7 @@ const LAST_READ_KEY = 'mimou_bookism_last_read'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const REWARDS_KEY = 'mimou_bookism_rewards'
+const READING_MODE_KEY = 'mimou_bookism_reading_mode'
 const BOOK_FIELDS = 'id,title,author,category,description,cover_url,file_path,file_url,book_url,is_free,price,views_count'
 
 function getFavorites() { try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] } }
@@ -29,7 +30,8 @@ export default function Reader() {
   const [rating, setRating] = useState(0)
   const [averageRating, setAverageRating] = useState(0)
   const [ratingCount, setRatingCount] = useState(0)
-  const [readingMode, setReadingMode] = useState(() => localStorage.getItem('mimou_bookism_reading_mode') === '1')
+  const [readingMode, setReadingMode] = useState(() => localStorage.getItem(READING_MODE_KEY) === '1')
+  const [fullscreen, setFullscreen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState('')
   const [sending, setSending] = useState(false)
@@ -38,6 +40,31 @@ export default function Reader() {
   const [error, setError] = useState('')
 
   useEffect(() => { setProgress(Number(getProgress()[id] || 0)) }, [id])
+
+  useEffect(() => {
+    function handleKeyDown(event) {
+      if (event.key === 'Escape' && readingMode) {
+        setReadingMode(false)
+        localStorage.setItem(READING_MODE_KEY, '0')
+      }
+      if (event.key.toLowerCase() === 'f' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+        event.preventDefault()
+        setReadingMode(current => {
+          const next = !current
+          localStorage.setItem(READING_MODE_KEY, next ? '1' : '0')
+          return next
+        })
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [readingMode])
+
+  useEffect(() => {
+    function handleFullscreenChange() { setFullscreen(Boolean(document.fullscreenElement)) }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [])
 
   useEffect(() => {
     let active = true
@@ -138,7 +165,20 @@ export default function Reader() {
     else setRewardNotice('🔖 Marque-page enregistré !')
   }
 
-  function toggleReadingMode() { const next = !readingMode; setReadingMode(next); localStorage.setItem('mimou_bookism_reading_mode', next ? '1' : '0') }
+  function toggleReadingMode() {
+    const next = !readingMode
+    setReadingMode(next)
+    localStorage.setItem(READING_MODE_KEY, next ? '1' : '0')
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen()
+    } catch (fullscreenError) {
+      console.warn('Plein écran indisponible:', fullscreenError)
+    }
+  }
 
   if (loading) return <div className="state">Chargement...</div>
   if (error && !book) return <div className="state error">Erreur : {error}</div>
@@ -154,6 +194,13 @@ export default function Reader() {
   return (
     <main className={`reader ${theme} ${readingMode ? 'reading-mode-active' : ''}`}>
       <div className="reader-card">
+        <div className={`reader-mode-bar ${readingMode ? 'is-active' : ''}`}>
+          <div className="reader-mode-title"><span>📖</span><strong>{readingMode ? 'Mode lecture' : 'Lecture'}</strong><span>{progress}%</span></div>
+          <div className="reader-mode-controls">
+            <button type="button" className="reader-mode-control" onClick={toggleReadingMode}>{readingMode ? '☀️ Normal' : '🌙 Focus'}</button>
+            <button type="button" className="reader-mode-control" onClick={toggleFullscreen}>{fullscreen ? '🗗 Quitter plein écran' : '⛶ Plein écran'}</button>
+          </div>
+        </div>
         <Link to={backPath} className="btn">← {isManga ? 'Mangathèque' : 'Bibliothèque'}</Link>
         {rewardNotice && <div className="reward-toast" role="status">{rewardNotice}<button type="button" onClick={() => setRewardNotice('')} aria-label="Fermer">×</button></div>}
         <h1>{book.title}</h1>
