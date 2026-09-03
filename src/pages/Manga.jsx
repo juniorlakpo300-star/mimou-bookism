@@ -40,11 +40,11 @@ export default function Manga() {
     })
   }, [mangas, search, genre])
 
-  if (loading) return <div className="state">Chargement des mangas...</div>
-  if (error) return <div className="state error">Erreur : {error}</div>
+  if (loading) return <div className="state manga-theme">Chargement des mangas...</div>
+  if (error) return <div className="state error manga-theme">Erreur : {error}</div>
 
   return (
-    <main className="page">
+    <main className="page manga-theme">
       <div className="container">
         <header className="header">
           <Link to="/" className="brand">MIMOU <span>BOOKISM</span></Link>
