@@ -54,11 +54,7 @@ export default function MimouIA() {
     setError('')
     setBooks([])
 
-    setMessages(prev => [
-      ...prev,
-      { role: 'user', content: text }
-    ])
-
+    setMessages(prev => [...prev, { role: 'user', content: text }])
     setLoading(true)
 
     try {
@@ -68,19 +64,28 @@ export default function MimouIA() {
         body: JSON.stringify({ message: text })
       })
 
-      const data = await response.json()
+      const raw = await response.text()
+      let data = {}
+
+      try {
+        data = raw ? JSON.parse(raw) : {}
+      } catch {
+        throw new Error(`Réponse invalide du serveur (${response.status}).`)
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || 'Erreur du service IA.')
+        throw new Error(data.error || `Erreur du service IA (${response.status}).`)
+      }
+
+      const reply = data.reply || data.answer
+
+      if (!reply) {
+        throw new Error('Lia n’a reçu aucune réponse du service IA.')
       }
 
       setMessages(prev => [
         ...prev,
-        {
-          role: 'assistant',
-          content:
-            data.answer || 'Désolée, je n’ai pas réussi à répondre.'
-        }
+        { role: 'assistant', content: reply }
       ])
 
       const lowerText = text.toLowerCase()
@@ -98,7 +103,8 @@ export default function MimouIA() {
         await searchBooks(text)
       }
     } catch (err) {
-      console.error(err)
+      console.error('Erreur Lia:', err)
+      setError(err.message || 'Erreur inconnue.')
       setMessages(prev => [
         ...prev,
         {
