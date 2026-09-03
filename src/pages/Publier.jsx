@@ -27,6 +27,7 @@ export default function Publier() {
       const cover = form.cover.files[0]
       const pdf = form.pdf.files[0]
 
+      if (!title) throw new Error('Indique le titre du livre.')
       if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
       if (pdf.type !== 'application/pdf') throw new Error('Le livre doit être un fichier PDF.')
       if (!isFree && price <= 0) throw new Error('Indique un prix supérieur à 0 ou coche Livre gratuit.')
@@ -47,6 +48,7 @@ export default function Publier() {
 
       const { error: insertError } = await supabase.from('books').insert({
         id,
+        owner_id: user.id,
         title,
         author,
         category: category || null,
@@ -75,9 +77,12 @@ export default function Publier() {
   return (
     <main className="form-page">
       <div className="form-card wide">
-        <Link to="/catalogue" className="btn">← Retour au catalogue</Link>
+        <div className="page-topline">
+          <Link to="/catalogue" className="btn">← Catalogue</Link>
+          <Link to="/ecrivain" className="btn secondary">Mes publications</Link>
+        </div>
         <h1>Publier un livre</h1>
-        <p className="form-intro">Connecté en tant que <strong>{user.email}</strong>.</p>
+        <p className="form-intro">Partage ton œuvre avec les lecteurs de MIMOU BOOKISM.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-row">
