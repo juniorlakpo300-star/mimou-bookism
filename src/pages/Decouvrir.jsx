@@ -4,6 +4,7 @@ import { supabase } from '../supabase.js'
 
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
+const HISTORY_KEY = 'mimou_bookism_reading_history'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const VISIT_KEY = 'mimou_bookism_last_visit'
@@ -12,11 +13,13 @@ const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BO
 
 function readIds(key) { try { return JSON.parse(localStorage.getItem(key) || '[]') } catch { return [] } }
 function readObject(key) { try { return JSON.parse(localStorage.getItem(key) || '{}') } catch { return {} } }
+function readHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') } catch { return [] } }
 
 export default function Decouvrir() {
   const [works, setWorks] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastRead, setLastRead] = useState(null)
+  const [history, setHistory] = useState(readHistory)
   const [newSinceVisit, setNewSinceVisit] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
   const [notificationsRead, setNotificationsRead] = useState(false)
@@ -27,6 +30,7 @@ export default function Decouvrir() {
   useEffect(() => {
     const saved = localStorage.getItem(LAST_READ_KEY)
     if (saved) try { setLastRead(JSON.parse(saved)) } catch {}
+    setHistory(readHistory())
     const previousVisit = Number(localStorage.getItem(VISIT_KEY) || 0)
     async function load() {
       const { data, error } = await supabase.from('books').select('id,title,author,category,description,cover_url,created_at,views_count,is_free').order('created_at', { ascending: false })
@@ -54,6 +58,7 @@ export default function Decouvrir() {
   const trends = useMemo(() => [...works].sort((a,b) => Number(b.views_count || 0) - Number(a.views_count || 0)).slice(0, 5), [works])
   const favorites = useMemo(() => favoriteIds.map(id => works.find(work => work.id === id)).filter(Boolean), [works, favoriteIds])
   const savedBookmarks = useMemo(() => Object.values(bookmarks).map(item => works.find(work => work.id === item.id) || item).filter(Boolean), [works, bookmarks])
+  const historyWorks = useMemo(() => history.map(item => works.find(work => work.id === item.id) || item).filter(Boolean).slice(0, 12), [works, history])
   const notificationItems = useMemo(() => {
     const previousVisit = Number(localStorage.getItem(VISIT_KEY) || 0)
     return previousVisit ? works.filter(work => new Date(work.created_at).getTime() > previousVisit).slice(0, 5) : []
@@ -116,7 +121,7 @@ export default function Decouvrir() {
 
         <section className="discover-section"><div className="discover-heading"><div><span>✨ NOUVEAUTÉS</span><h2>Les dernières publications</h2></div><span>{newest.length} œuvres</span></div>{newest.length === 0 ? <div className="empty-card"><h2>Pas encore de publication</h2></div> : <div className="discover-grid">{newest.map(work => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt={`Couverture de ${work.title || 'œuvre'}`} loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>{typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'}</p></div></Link>)}</div>}</section>
 
-        <section className="discover-section"><div className="discover-heading"><div><span>🕘 HISTORIQUE RÉCENT</span><h2>Ta dernière lecture</h2></div><span>Reprise rapide</span></div>{lastRead && works.some(work => work.id === lastRead.id) ? <div className="history-discover-card"><img src={lastRead.cover_url || FALLBACK_COVER} alt="" loading="lazy" /><div><span className="section-kicker">{progress >= 100 ? 'LECTURE TERMINÉE' : 'EN COURS'}</span><h3>{lastRead.title}</h3><p>Progression enregistrée : <strong>{progress}%</strong></p><Link to={`/read/${lastRead.id}`} className="btn primary">{progress >= 100 ? '📖 Relire' : '▶️ Reprendre'}</Link></div></div> : <div className="empty-card"><h2>Aucune lecture récente</h2><p>Ouvre une œuvre pour commencer ton historique.</p><div><Link to="/livres" className="btn primary">📚 Choisir un livre</Link> <Link to="/mangas" className="btn">🗯️ Choisir un manga</Link></div></div>}</section>
+        <section className="discover-section"><div className="discover-heading"><div><span>🕘 HISTORIQUE RÉCENT</span><h2>Tes lectures récentes</h2></div><span>{historyWorks.length} / 12</span></div>{historyWorks.length ? <div className="discover-history-grid">{historyWorks.map(work => { const item = history.find(entry => entry.id === work.id) || work; const itemProgress = Number(progressMap[work.id] ?? item.progress ?? 0); return <Link key={work.id} to={`/read/${work.id}`} className="history-discover-card"><img src={work.cover_url || FALLBACK_COVER} alt="" loading="lazy" /><div><span className="section-kicker">{itemProgress >= 100 ? 'LECTURE TERMINÉE' : 'EN COURS'}</span><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'} · <strong>{itemProgress}%</strong></p><div className="continue-progress-track" aria-hidden="true"><div className="continue-progress-fill" style={{ width: `${itemProgress}%` }} /></div><span className="btn primary">{itemProgress >= 100 ? '📖 Relire' : '▶️ Reprendre'}</span></div></Link> })}</div> : <div className="empty-card"><h2>Aucune lecture récente</h2><p>Ouvre une œuvre pour commencer ton historique.</p><div><Link to="/livres" className="btn primary">📚 Choisir un livre</Link> <Link to="/mangas" className="btn">🗯️ Choisir un manga</Link></div></div>}</section>
 
         <section className="discover-section"><div className="discover-heading"><div><span>🏆 TES BADGES</span><h2>Ta collection de récompenses</h2></div><span>{unlockedBadges}/{badges.length} débloqués</span></div><div className="badge-showcase">{badges.map(badge => <div key={badge.id} className={`reader-badge ${badge.unlocked ? 'unlocked' : ''}`}><span className="badge-icon">{badge.icon}</span><strong>{badge.title}</strong><small>{badge.unlocked ? '✓ Débloqué' : badge.text}</small></div>)}</div></section>
 
