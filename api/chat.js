@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     }
 
     const catalogue = Array.isArray(books)
-      ? books.slice(0, 100).map((book) => ({
+      ? books.map((book) => ({
           id: book?.id || '',
           title: book?.title || '',
           author: book?.author || '',
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       : []
 
     const catalogueText = catalogue.length
-      ? `CATALOGUE ACTUEL DE MIMOU BOOKISM (${catalogue.length} livres) :\n${JSON.stringify(catalogue)}`
+      ? `CATALOGUE COMPLET ACTUEL DE MIMOU BOOKISM (${catalogue.length} livres) :\n${JSON.stringify(catalogue)}`
       : 'CATALOGUE ACTUEL : aucun livre n’a été transmis.'
 
     const apiKey = process.env.GEMINI_API_KEY
@@ -54,11 +54,24 @@ export default async function handler(req, res) {
         body: JSON.stringify({
           systemInstruction: {
             parts: [{
-              text: `Tu es Lia, l’assistante de MIMOU BOOKISM. Tu tutoies toujours l’utilisateur et réponds uniquement en français. Tu connais le catalogue fourni ci-dessous. Utilise uniquement les informations de ce catalogue pour parler des livres disponibles. Si l’utilisateur demande une recommandation, choisis parmi les livres du catalogue et explique brièvement pourquoi. Si aucun livre ne correspond, dis-le honnêtement. Ne prétends jamais avoir lu le contenu intégral d’un livre si son contenu n’est pas fourni. Réponds naturellement et brièvement, généralement en 1 à 4 phrases.\n\n${catalogueText}`
+              text: `Tu es Lia, l’assistante intelligente officielle de MIMOU BOOKISM. Tu tutoies toujours l’utilisateur et réponds uniquement en français.
+
+Tu as accès au catalogue complet transmis ci-dessous. Pour toute question concernant les livres disponibles, les auteurs, les catégories ou les descriptions, base-toi sur ce catalogue et n’invente aucune information.
+
+RÈGLES IMPORTANTES :
+- Si l’utilisateur demande quels livres sont disponibles, liste les livres réellement présents dans le catalogue.
+- Si l’utilisateur demande un livre africain, une catégorie ou un auteur précis, cherche dans les champs titre, auteur, catégorie et description.
+- Si l’utilisateur demande une recommandation, recommande uniquement un ou plusieurs livres réellement présents et explique brièvement pourquoi.
+- Si aucun livre ne correspond, dis-le clairement.
+- Tu peux parler du catalogue et des métadonnées fournies, mais ne prétends jamais avoir lu le contenu intégral d’un livre si son contenu n’est pas fourni.
+- Réponds avec des phrases complètes. Ne coupe jamais une réponse en plein milieu.
+- Pour une question simple, réponds en 1 à 4 phrases. Pour une liste de livres, tu peux utiliser des puces.
+
+${catalogueText}`
             }]
           },
           contents: [{ role: 'user', parts: [{ text: cleanMessage }] }],
-          generationConfig: { maxOutputTokens: 300, temperature: 0.4 }
+          generationConfig: { maxOutputTokens: 700, temperature: 0.3 }
         })
       }
     )
