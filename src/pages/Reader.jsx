@@ -7,6 +7,7 @@ const PSEUDO_KEY = 'mimou_bookism_pseudo'
 const SECTION_KEY = 'mimou_bookism_section'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
+const HISTORY_KEY = 'mimou_bookism_reading_history'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const REWARDS_KEY = 'mimou_bookism_rewards'
@@ -17,6 +18,12 @@ function getFavorites() { try { return JSON.parse(localStorage.getItem(FAVORITES
 function getBookmarks() { try { return JSON.parse(localStorage.getItem(BOOKMARKS_KEY) || '{}') } catch { return {} } }
 function getProgress() { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') } catch { return {} } }
 function getRewards() { try { return JSON.parse(localStorage.getItem(REWARDS_KEY) || '{}') } catch { return {} } }
+function getHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') } catch { return [] } }
+function saveHistoryEntry(entry) {
+  const history = getHistory().filter(item => item?.id !== entry.id)
+  history.unshift({ ...entry, at: Date.now() })
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 12)))
+}
 
 export default function Reader() {
   const { id } = useParams()
@@ -80,7 +87,10 @@ export default function Reader() {
         setBook(bookData)
         const manga = String(bookData?.category || '').toLowerCase().startsWith('manga •')
         localStorage.setItem(SECTION_KEY, manga ? 'manga' : 'books')
-        localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: bookData.id, title: bookData.title, cover_url: bookData.cover_url, progress: Number(getProgress()[id] || 0), at: Date.now() }))
+        const savedProgress = Number(getProgress()[id] || 0)
+        const historyEntry = { id: bookData.id, title: bookData.title, cover_url: bookData.cover_url, progress: savedProgress, author: bookData.author || '', category: bookData.category || '', at: Date.now() }
+        saveHistoryEntry(historyEntry)
+        localStorage.setItem(LAST_READ_KEY, JSON.stringify(historyEntry))
         const readCount = Number(localStorage.getItem('mimou_bookism_read_count') || 0) + 1
         localStorage.setItem('mimou_bookism_read_count', String(readCount))
         const rewards = getRewards()
@@ -136,7 +146,9 @@ export default function Reader() {
     setProgress(cleanValue)
     const next = getProgress(); next[id] = cleanValue
     localStorage.setItem(PROGRESS_KEY, JSON.stringify(next))
-    localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: book?.id || id, title: book?.title || '', cover_url: book?.cover_url || '', progress: cleanValue, at: Date.now() }))
+    const historyEntry = { id: book?.id || id, title: book?.title || '', cover_url: book?.cover_url || '', progress: cleanValue, author: book?.author || '', category: book?.category || '', at: Date.now() }
+    saveHistoryEntry(historyEntry)
+    localStorage.setItem(LAST_READ_KEY, JSON.stringify(historyEntry))
     if (cleanValue >= 100 && previous < 100) {
       const rewards = getRewards(); rewards.completed = Number(rewards.completed || 0) + 1
       if (!rewards.firstComplete) { rewards.firstComplete = true; setRewardNotice('🏁 Badge débloqué : Lecture terminée !') }
