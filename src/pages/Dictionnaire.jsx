@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../supabase.js'
 import '../discover.css'
 import '../dictionary.css'
 
-const ENTRIES = [
+const FALLBACK_ENTRIES = [
   { word: 'Persévérance', type: 'Mot difficile', definition: 'Le fait de continuer malgré les difficultés ou les obstacles.', example: 'Sa persévérance lui a permis de terminer son projet.', tags: ['Français', 'Vie quotidienne'] },
   { word: 'Éloquent', type: 'Mot difficile', definition: 'Qui s’exprime avec beaucoup de facilité et de force.', example: 'Son discours était clair et éloquent.', tags: ['Français'] },
   { word: 'Ambigu', type: 'Mot difficile', definition: 'Qui peut être compris de plusieurs façons et manque parfois de clarté.', example: 'Cette phrase est ambiguë.', tags: ['Français'] },
@@ -18,21 +19,41 @@ const ENTRIES = [
   { word: 'Shōjo', type: 'Culture manga', definition: 'Catégorie éditoriale japonaise visant principalement un public adolescent féminin, souvent associée aux relations et aux émotions.', example: 'Les mangas shōjo peuvent mettre l’accent sur les relations entre personnages.', tags: ['Manga', 'Culture'] },
 ]
 
-const CATEGORIES = ['Tout', 'Mot difficile', 'Terme manga', 'Culture manga']
+const CATEGORIES = ['Tout', 'Mot difficile', 'Terme manga', 'Culture manga', 'Expression japonaise']
 
 export default function Dictionnaire() {
+  const [entries, setEntries] = useState(FALLBACK_ENTRIES)
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Tout')
   const [selected, setSelected] = useState(null)
 
+  useEffect(() => {
+    let active = true
+
+    async function loadDictionary() {
+      const { data, error } = await supabase
+        .from('dictionary_entries')
+        .select('id, word, type, definition, example, tags')
+        .order('word', { ascending: true })
+
+      if (!error && Array.isArray(data) && data.length && active) {
+        setEntries(data)
+      }
+    }
+
+    loadDictionary()
+    return () => { active = false }
+  }, [])
+
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase()
-    return ENTRIES.filter((entry) => {
+    return entries.filter((entry) => {
       const matchesCategory = category === 'Tout' || entry.type === category
-      const haystack = `${entry.word} ${entry.definition} ${entry.example} ${entry.tags.join(' ')}`.toLowerCase()
+      const tags = Array.isArray(entry.tags) ? entry.tags : []
+      const haystack = `${entry.word} ${entry.definition} ${entry.example || ''} ${tags.join(' ')}`.toLowerCase()
       return matchesCategory && (!normalized || haystack.includes(normalized))
     })
-  }, [query, category])
+  }, [entries, query, category])
 
   return (
     <main className="landing-page home-v2 dictionary-page">
@@ -71,11 +92,11 @@ export default function Dictionnaire() {
 
         <div className="dictionary-grid">
           {filtered.map((entry) => (
-            <button key={entry.word} type="button" className="dictionary-card" onClick={() => setSelected(entry)}>
+            <button key={entry.id || entry.word} type="button" className="dictionary-card" onClick={() => setSelected(entry)}>
               <div className="dictionary-card-top"><span>{entry.type}</span><b>→</b></div>
               <h3>{entry.word}</h3>
               <p>{entry.definition}</p>
-              <div className="dictionary-tags">{entry.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+              <div className="dictionary-tags">{(Array.isArray(entry.tags) ? entry.tags : []).map((tag) => <span key={tag}>{tag}</span>)}</div>
             </button>
           ))}
         </div>
@@ -97,8 +118,8 @@ export default function Dictionnaire() {
             <span className="world-kicker">{selected.type}</span>
             <h2 id="dictionary-modal-title">{selected.word}</h2>
             <div className="dictionary-definition"><strong>Définition simple</strong><p>{selected.definition}</p></div>
-            <div className="dictionary-example"><strong>Exemple</strong><p>{selected.example}</p></div>
-            <div className="dictionary-tags">{selected.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+            <div className="dictionary-example"><strong>Exemple</strong><p>{selected.example || 'Aucun exemple ajouté pour le moment.'}</p></div>
+            <div className="dictionary-tags">{(Array.isArray(selected.tags) ? selected.tags : []).map((tag) => <span key={tag}>{tag}</span>)}</div>
           </section>
         </div>
       )}
