@@ -12,6 +12,7 @@ export default function Catalogue() {
   const [category, setCategory] = useState('Toutes')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     async function fetchBooks() {
@@ -22,6 +23,18 @@ export default function Catalogue() {
     }
     fetchBooks()
   }, [])
+
+  useEffect(() => {
+    async function checkAdmin() {
+      if (!user) {
+        setIsAdmin(false)
+        return
+      }
+      const { data } = await supabase.from('admins').select('user_id').eq('user_id', user.id).maybeSingle()
+      setIsAdmin(Boolean(data))
+    }
+    checkAdmin()
+  }, [user])
 
   const categories = useMemo(() => ['Toutes', ...new Set(books.map(b => b.category).filter(Boolean))], [books])
 
@@ -46,17 +59,18 @@ export default function Catalogue() {
         <header className="header">
           <Link to="/" className="brand">MIMOU <span>BOOKISM</span></Link>
           <nav className="nav">
-            <Link to="/catalogue" className="btn">Catalogue</Link>
+            <Link to="/catalogue" className="btn active">Catalogue</Link>
             {user ? (
               <>
+                <Link to="/ecrivain" className="btn">✍️ Espace écrivain</Link>
+                {isAdmin && <Link to="/admin" className="btn admin-btn">🛡️ Admin</Link>}
                 <span className="user-chip">👤 {user.email}</span>
                 <button onClick={handleLogout} className="btn">Déconnexion</button>
-                <Link to="/publier" className="btn primary">+ Publier</Link>
               </>
             ) : (
               <>
                 <Link to="/connexion" className="btn">Connexion</Link>
-                <Link to="/inscription" className="btn">Créer un compte</Link>
+                <Link to="/inscription" className="btn primary">Créer un compte</Link>
               </>
             )}
           </nav>
@@ -66,6 +80,12 @@ export default function Catalogue() {
           <p className="eyebrow">BIBLIOTHÈQUE NUMÉRIQUE</p>
           <h1>Découvrez votre prochaine lecture.</h1>
           <p>Explorez, lisez et téléchargez vos livres préférés sur MIMOU BOOKISM.</p>
+          {user && (
+            <div className="hero-actions">
+              <Link to="/publier" className="btn primary">+ Publier un livre</Link>
+              <Link to="/ecrivain" className="btn">Voir mes publications</Link>
+            </div>
+          )}
         </section>
 
         <section className="filters">
@@ -75,13 +95,24 @@ export default function Catalogue() {
           </select>
         </section>
 
+        <div className="catalogue-heading">
+          <div>
+            <p className="section-kicker">NOTRE COLLECTION</p>
+            <h2>Livres disponibles</h2>
+          </div>
+          <span className="result-count">{filteredBooks.length} livre{filteredBooks.length > 1 ? 's' : ''}</span>
+        </div>
+
         {filteredBooks.length === 0 ? (
-          <div className="state">Aucun livre ne correspond à votre recherche.</div>
+          <div className="empty-card">Aucun livre ne correspond à votre recherche.</div>
         ) : (
           <section className="book-grid">
             {filteredBooks.map(book => (
               <Link key={book.id} to={`/read/${book.id}`} className="book-card">
-                <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+                <div className="cover-wrap">
+                  <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+                  <span className={`book-status ${book.is_free ? 'free' : 'paid'}`}>{book.is_free ? 'Gratuit' : `${book.price || 0} FCFA`}</span>
+                </div>
                 <div className="book-info">
                   <h2 className="book-title">{book.title || 'Sans titre'}</h2>
                   <p className="book-author">{book.author || 'Auteur inconnu'}</p>
