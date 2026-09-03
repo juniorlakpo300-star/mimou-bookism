@@ -8,6 +8,7 @@ const SECTION_KEY = 'mimou_bookism_section'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
 const HISTORY_KEY = 'mimou_bookism_reading_history'
+const NOTES_KEY = 'mimou_bookism_reading_notes'
 const BOOKMARKS_KEY = 'mimou_bookism_bookmarks'
 const PROGRESS_KEY = 'mimou_bookism_reading_progress'
 const REWARDS_KEY = 'mimou_bookism_rewards'
@@ -19,6 +20,7 @@ function getBookmarks() { try { return JSON.parse(localStorage.getItem(BOOKMARKS
 function getProgress() { try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}') } catch { return {} } }
 function getRewards() { try { return JSON.parse(localStorage.getItem(REWARDS_KEY) || '{}') } catch { return {} } }
 function getHistory() { try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') } catch { return [] } }
+function getNotes() { try { return JSON.parse(localStorage.getItem(NOTES_KEY) || '{}') } catch { return {} } }
 function saveHistoryEntry(entry) {
   const history = getHistory().filter(item => item?.id !== entry.id)
   history.unshift({ ...entry, at: Date.now() })
@@ -34,6 +36,8 @@ export default function Reader() {
   const [favorites, setFavorites] = useState(getFavorites)
   const [bookmarks, setBookmarks] = useState(getBookmarks)
   const [progress, setProgress] = useState(() => Number(getProgress()[id] || 0))
+  const [notes, setNotes] = useState(getNotes)
+  const [noteSaved, setNoteSaved] = useState(false)
   const [rating, setRating] = useState(0)
   const [averageRating, setAverageRating] = useState(0)
   const [ratingCount, setRatingCount] = useState(0)
@@ -46,7 +50,7 @@ export default function Reader() {
   const [rewardNotice, setRewardNotice] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => { setProgress(Number(getProgress()[id] || 0)) }, [id])
+  useEffect(() => { setProgress(Number(getProgress()[id] || 0)); setNotes(getNotes()); setNoteSaved(false) }, [id])
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -156,6 +160,27 @@ export default function Reader() {
     }
   }
 
+  function saveNote() {
+    const cleanNote = String(notes[id] || '').trim()
+    if (cleanNote.length > 2000) return alert('La note ne peut pas dépasser 2000 caractères.')
+    const next = { ...getNotes() }
+    if (cleanNote) next[id] = cleanNote
+    else delete next[id]
+    setNotes(next)
+    localStorage.setItem(NOTES_KEY, JSON.stringify(next))
+    setNoteSaved(true)
+    window.setTimeout(() => setNoteSaved(false), 1800)
+  }
+
+  function clearNote() {
+    const next = { ...getNotes() }
+    delete next[id]
+    setNotes(next)
+    localStorage.setItem(NOTES_KEY, JSON.stringify(next))
+    setNoteSaved(true)
+    window.setTimeout(() => setNoteSaved(false), 1800)
+  }
+
   function toggleFavorite() {
     const adding = !favorites.includes(id)
     const next = adding ? [...favorites, id] : favorites.filter(item => item !== id)
@@ -202,6 +227,7 @@ export default function Reader() {
   const typeLabel = isManga ? 'Manga' : 'Livre'
   const isFavorite = favorites.includes(id)
   const isBookmarked = Boolean(bookmarks[id])
+  const currentNote = notes[id] || ''
 
   return (
     <main className={`reader ${theme} ${readingMode ? 'reading-mode-active' : ''}`}>
@@ -226,6 +252,12 @@ export default function Reader() {
           <div className="reading-progress-track" aria-hidden="true"><div className="reading-progress-fill" style={{ width: `${progress}%` }} /></div>
           <input type="range" min="0" max="100" step="5" value={progress} onChange={e => saveProgress(e.target.value)} aria-label="Progression de lecture" />
           <small>Ta progression est enregistrée sur cet appareil.</small>
+        </section>
+        <section className="reading-progress-panel" aria-label="Notes personnelles">
+          <div className="reading-progress-heading"><strong>📝 Mes notes</strong><span>{currentNote.length}/2000</span></div>
+          <p className="muted">Garde ici tes idées, passages à retenir ou impressions. Cette note reste sur cet appareil.</p>
+          <textarea value={currentNote} onChange={e => setNotes(prev => ({ ...prev, [id]: e.target.value.slice(0, 2000) }))} placeholder="Écris ta note personnelle sur cette œuvre..." rows="5" maxLength="2000" style={{ width: '100%', boxSizing: 'border-box', marginTop: 10 }} />
+          <div className="reader-actions" style={{ marginTop: 10 }}><button type="button" className="btn primary" onClick={saveNote}>💾 Enregistrer ma note</button>{currentNote && <button type="button" className="btn" onClick={clearNote}>🗑️ Effacer</button>}{noteSaved && <span className="muted">✓ Note enregistrée</span>}</div>
         </section>
         <div className="reader-actions">
           <button type="button" className={`btn ${isFavorite ? 'favorite-reading' : ''}`} onClick={toggleFavorite}>{isFavorite ? '❤️ Dans ma bibliothèque' : '♡ Ajouter à ma bibliothèque'}</button>
