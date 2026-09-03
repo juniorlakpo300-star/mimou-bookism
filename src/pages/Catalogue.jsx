@@ -47,7 +47,6 @@ export default function Catalogue() {
   }, [searchParams])
 
   const displayCategory = book => String(book.category || '')
-
   const categories = useMemo(() => ['Toutes', ...new Set(books.map(displayCategory).filter(Boolean))], [books])
   const authors = useMemo(() => ['Tous les auteurs', ...new Set(books.map(book => String(book.author || '').trim()).filter(Boolean).sort((a, b) => a.localeCompare(b)))], [books])
 
@@ -59,7 +58,6 @@ export default function Catalogue() {
       const accessOk = type === 'Tous' || (type === 'Gratuit' && book.is_free) || (type === 'Premium' && !book.is_free)
       return accessOk && (!q || searchable.includes(q)) && (category === 'Toutes' || cat === category) && (author === 'Tous les auteurs' || String(book.author || '') === author)
     })
-
     if (sort === 'title') return [...result].sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')))
     if (sort === 'author') return [...result].sort((a, b) => String(a.author || '').localeCompare(String(b.author || '')))
     return result
@@ -76,11 +74,7 @@ export default function Catalogue() {
   }
 
   function resetFilters() {
-    setSearch('')
-    setType('Tous')
-    setCategory('Toutes')
-    setAuthor('Tous les auteurs')
-    setSort('recent')
+    setSearch(''); setType('Tous'); setCategory('Toutes'); setAuthor('Tous les auteurs'); setSort('recent')
   }
 
   if (loading) return <div className="state books-theme">Chargement de la bibliothèque...</div>
@@ -109,7 +103,11 @@ export default function Catalogue() {
         </section>
 
         <section className="filters advanced-filters">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔎 Titre, auteur, description, catégorie..." aria-label="Rechercher un livre" />
+          <div className="catalogue-search-shell">
+            <span className="catalogue-search-icon" aria-hidden="true">⌕</span>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un titre, auteur, catégorie..." aria-label="Rechercher un livre" />
+            {search && <button type="button" className="catalogue-search-clear" onClick={() => setSearch('')} aria-label="Effacer la recherche">×</button>}
+          </div>
           <select value={type} onChange={e => { setType(e.target.value); setCategory('Toutes') }}><option value="Tous">📚 Tous les livres</option><option value="Gratuit">🆓 Gratuits</option><option value="Premium">👑 Premium</option></select>
           <select value={category} onChange={e => setCategory(e.target.value)}>{categories.map(item => <option key={item}>{item}</option>)}</select>
           <select value={author} onChange={e => setAuthor(e.target.value)}>{authors.map(item => <option key={item}>{item}</option>)}</select>
