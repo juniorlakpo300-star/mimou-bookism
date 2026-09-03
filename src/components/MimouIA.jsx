@@ -22,7 +22,6 @@ export default function MimouIA() {
     if (!text) return
 
     setSearchLoading(true)
-    setError('')
     setBooks([])
 
     const safeQuery = text.replace(/[%_,]/g, ' ')
@@ -54,7 +53,13 @@ export default function MimouIA() {
     setError('')
     setBooks([])
 
-    setMessages(prev => [...prev, { role: 'user', content: text }])
+    const assistantIndex = messages.length + 1
+
+    setMessages(prev => [
+      ...prev,
+      { role: 'user', content: text },
+      { role: 'assistant', content: '' }
+    ])
     setLoading(true)
 
     try {
@@ -64,29 +69,69 @@ export default function MimouIA() {
         body: JSON.stringify({ message: text })
       })
 
-      const raw = await response.text()
-      let data = {}
-
-      try {
-        data = raw ? JSON.parse(raw) : {}
-      } catch {
-        throw new Error(`Réponse invalide du serveur (${response.status}).`)
-      }
-
       if (!response.ok) {
+        const raw = await response.text()
+        let data = {}
+        try {
+          data = raw ? JSON.parse(raw) : {}
+        } catch {
+          // Réponse non JSON.
+        }
         throw new Error(data.error || `Erreur du service IA (${response.status}).`)
       }
 
-      const reply = data.reply || data.answer
+      if (!response.body) {
+        throw new Error('Le serveur n’a pas fourni de flux de réponse.')
+      }
 
-      if (!reply) {
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let fullReply = ''
+
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const events = buffer.split('\n\n')
+        buffer = events.pop() || ''
+
+        for (const event of events) {
+          const line = event
+            .split('\n')
+            .find(item => item.startsWith('data:'))
+
+          if (!line) continue
+
+          const jsonText = line.slice(5).trim()
+          if (!jsonText || jsonText === '[DONE]') continue
+
+          try {
+            const data = JSON.parse(jsonText)
+            const chunk = data?.text || ''
+            if (!chunk) continue
+
+            fullReply += chunk
+
+            setMessages(prev =>
+              prev.map((item, index) =>
+                index === assistantIndex
+                  ? { ...item, content: fullReply }
+                  : item
+              )
+            )
+          } catch {
+            // On ignore un événement incomplet ou invalide.
+          }
+        }
+      }
+
+      if (!fullReply.trim()) {
         throw new Error('Lia n’a reçu aucune réponse du service IA.')
       }
 
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: reply }
-      ])
+      setLoading(false)
 
       const lowerText = text.toLowerCase()
       const wantsBook =
@@ -100,20 +145,22 @@ export default function MimouIA() {
         lowerText.includes('développement')
 
       if (wantsBook) {
-        await searchBooks(text)
+        searchBooks(text)
       }
     } catch (err) {
       console.error('Erreur Lia:', err)
       setError(err.message || 'Erreur inconnue.')
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content:
-            'Désolée 😕 Je rencontre actuellement un problème pour me connecter au service IA.'
-        }
-      ])
-    } finally {
+      setMessages(prev =>
+        prev.map((item, index) =>
+          index === assistantIndex
+            ? {
+                ...item,
+                content:
+                  'Désolée 😕 Je rencontre actuellement un problème pour me connecter au service IA.'
+              }
+            : item
+        )
+      )
       setLoading(false)
     }
   }
@@ -129,8 +176,7 @@ export default function MimouIA() {
     setMessages([
       {
         role: 'assistant',
-        content:
-          'Bonjour 👋 Je suis Lia. Comment puis-je t’aider aujourd’hui ?'
+        content: 'Bonjour 👋 Je suis Lia. Comment puis-je t’aider aujourd’hui ?'
       }
     ])
     setBooks([])
@@ -209,22 +255,13 @@ export default function MimouIA() {
                   borderRadius: item.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                   background: item.role === 'user' ? '#1e293b' : '#111827',
                   border: item.role === 'user' ? '1px solid #334155' : '1px solid #1e293b',
-                  color: '#f8fafc', fontSize: '13px', lineHeight: '1.55', whiteSpace: 'pre-wrap'
+                  color: '#f8fafc', fontSize: '13px', lineHeight: '1.55', whiteSpace: 'pre-wrap',
+                  minHeight: item.content ? undefined : '22px'
                 }}>
-                  {item.content}
+                  {item.content || (index === messages.length - 1 && loading ? 'Lia écrit...' : '')}
                 </div>
               </div>
             ))}
-
-            {loading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <div style={{
-                  padding: '11px 14px', borderRadius: '16px 16px 16px 4px',
-                  background: '#111827', border: '1px solid #1e293b',
-                  color: '#94a3b8', fontSize: '13px'
-                }}>Lia réfléchit...</div>
-              </div>
-            )}
 
             {searchLoading && (
               <div style={{ color: '#64748b', fontSize: '11px', paddingLeft: '4px' }}>
