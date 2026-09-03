@@ -1,14 +1,9 @@
 import '../landing.css'
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAuth } from '../AuthContext.jsx'
 
 const PUBLIC_SITE_URL = 'https://mimou-bookism-hz66pjgau-mimou.vercel.app/'
 
 export default function Home() {
-  const { user } = useAuth()
-  const [shared, setShared] = useState(false)
-
   const shareSite = async () => {
     const shareData = {
       title: 'MIMOU BOOKISM',
@@ -21,17 +16,15 @@ export default function Home() {
         await navigator.share(shareData)
       } else {
         await navigator.clipboard.writeText(PUBLIC_SITE_URL)
-        setShared(true)
-        setTimeout(() => setShared(false), 2500)
+        alert('Lien du site copié !')
       }
     } catch (error) {
       if (error?.name !== 'AbortError') {
         try {
           await navigator.clipboard.writeText(PUBLIC_SITE_URL)
-          setShared(true)
-          setTimeout(() => setShared(false), 2500)
+          alert('Lien du site copié !')
         } catch {
-          setShared(false)
+          // Rien à faire si le navigateur bloque le presse-papiers.
         }
       }
     }
@@ -42,7 +35,7 @@ export default function Home() {
       <header className="landing-header">
         <Link to="/" className="landing-brand">MIMOU <span>BOOKISM</span></Link>
         <div className="landing-header-actions">
-          <button type="button" className="share-site-btn" onClick={shareSite}>🔗 {shared ? 'Lien copié !' : 'Partager le site'}</button>
+          <button type="button" className="share-site-btn" onClick={shareSite}>🔗 Partager le site</button>
           <Link to="/admin" className="btn admin-btn">🛠️ Admin</Link>
         </div>
       </header>
@@ -60,13 +53,12 @@ export default function Home() {
           <div><span className="access-label">ACCÈS LIBRE</span><h2>Livres gratuits</h2><p>Lisez les livres gratuits sans créer de compte.</p></div>
           <strong>→</strong>
         </Link>
-        <Link to={user ? '/catalogue?access=premium' : '/inscription'} className="access-card premium-card">
+        <Link to="/catalogue?access=premium" className="access-card premium-card">
           <div className="access-icon">👑</div>
-          <div><span className="access-label">ACCÈS MEMBRE</span><h2>Premium</h2><p>{user ? 'Accédez à votre espace Premium.' : 'Créez un compte pour accéder à Premium.'}</p></div>
+          <div><span className="access-label">PREMIUM</span><h2>Livres Premium</h2><p>Découvrez l'espace Premium de MIMOU BOOKISM.</p></div>
           <strong>→</strong>
         </Link>
       </section>
-      {!user && <p className="landing-login">Déjà membre ? <Link to="/connexion">Se connecter</Link></p>}
     </main>
   )
 }
