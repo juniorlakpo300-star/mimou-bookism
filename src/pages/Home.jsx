@@ -2,6 +2,7 @@ import '../landing.css'
 import { Link } from 'react-router-dom'
 
 const PUBLIC_SITE_URL = 'https://mimou-bookism-hz66pjgau-mimou.vercel.app/'
+const WHATSAPP_URL = 'https://wa.me/2250566111378?text=Bonjour%20MIMOU%20BOOKISM%2C%20je%20souhaite%20publier%20sur%20votre%20site.'
 
 export default function Home() {
   const shareSite = async () => {
@@ -55,6 +56,14 @@ export default function Home() {
           <div><span className="access-label">MANGATHÈQUE</span><h2>Mangas</h2><p>Retrouve les mangas, leurs tomes et leurs chapitres dans un espace dédié.</p></div>
           <strong>→</strong>
         </Link>
+      </section>
+
+      <section className="landing-options" style={{ marginTop: '24px' }}>
+        <a href={WHATSAPP_URL} target="_blank" rel="noreferrer" className="access-card free-card">
+          <div className="access-icon">📲</div>
+          <div><span className="access-label">PUBLICATION</span><h2>Publier sur MIMOU BOOKISM</h2><p>Tu veux publier ton livre ou ton manga sur le site ? Contacte-nous sur WhatsApp au <strong>+225 05 66 11 13 78</strong>.</p></div>
+          <strong>→</strong>
+        </a>
       </section>
 
       <section style={{ maxWidth: 900, margin: '0 auto', padding: '0 20px 60px', textAlign: 'center' }}>
