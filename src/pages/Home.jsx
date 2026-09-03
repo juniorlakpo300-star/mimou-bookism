@@ -1,3 +1,4 @@
+import '../landing.css'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../AuthContext.jsx'
 
@@ -24,14 +25,12 @@ export default function Home() {
           <div><span className="access-label">ACCÈS LIBRE</span><h2>Livres gratuits</h2><p>Lisez les livres gratuits sans créer de compte.</p></div>
           <strong>→</strong>
         </Link>
-
         <Link to={user ? '/catalogue?access=premium' : '/inscription'} className="access-card premium-card">
           <div className="access-icon">👑</div>
           <div><span className="access-label">ACCÈS MEMBRE</span><h2>Premium</h2><p>{user ? 'Accédez à votre espace Premium.' : 'Créez un compte pour accéder à Premium.'}</p></div>
           <strong>→</strong>
         </Link>
       </section>
-
       {!user && <p className="landing-login">Déjà membre ? <Link to="/connexion">Se connecter</Link></p>}
     </main>
   )
