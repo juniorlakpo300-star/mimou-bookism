@@ -32,7 +32,9 @@ export default function Publier() {
 
       if (!title) throw new Error('Indique le titre du livre.')
       if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
-      if (pdf.type !== 'application/pdf') throw new Error('Le livre doit être un fichier PDF.')
+      if (pdf.type !== 'application/pdf' && !pdf.name.toLowerCase().endsWith('.pdf')) {
+        throw new Error('Le livre doit être un fichier PDF.')
+      }
 
       const id = crypto.randomUUID()
       const coverExt = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -42,23 +44,24 @@ export default function Publier() {
       const { error: coverError } = await supabase.storage
         .from('covers')
         .upload(coverPath, cover, { upsert: false })
-      if (coverError) throw coverError
+      if (coverError) throw new Error(`Erreur couverture : ${coverError.message}`)
 
       const { error: pdfError } = await supabase.storage
         .from('books')
         .upload(pdfPath, pdf, {
           contentType: 'application/pdf',
+          cacheControl: '3600',
           upsert: false
         })
-      if (pdfError) throw pdfError
-
-      const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
-      const { data: pdfData } = supabase.storage.from('books').getPublicUrl(pdfPath)
-
-      if (!pdfData?.publicUrl) {
-        throw new Error('Impossible de créer le lien public du PDF. Vérifie que le bucket « books » est public dans Supabase.')
+      if (pdfError) {
+        await supabase.storage.from('covers').remove([coverPath])
+        throw new Error(`Erreur PDF : ${pdfError.message}. Vérifie le bucket « books » et ses permissions Supabase.`)
       }
 
+      const { data: coverData } = supabase.storage.from('covers').getPublicUrl(coverPath)
+
+      // Le bucket books est privé : on conserve le chemin du fichier et
+      // la page Lecteur créera ensuite une URL signée pour le PDF.
       const { error: insertError } = await supabase.from('books').insert({
         id,
         owner_id: user.id,
@@ -69,11 +72,14 @@ export default function Publier() {
         price: 0,
         is_free: true,
         cover_url: coverData.publicUrl,
-        book_url: pdfData.publicUrl,
-        file_url: pdfData.publicUrl
+        file_path: pdfPath
       })
 
-      if (insertError) throw insertError
+      if (insertError) {
+        await supabase.storage.from('books').remove([pdfPath])
+        await supabase.storage.from('covers').remove([coverPath])
+        throw new Error(`Livre non enregistré : ${insertError.message}`)
+      }
 
       alert('✅ Livre gratuit publié avec succès !')
       navigate(`/read/${id}`)
