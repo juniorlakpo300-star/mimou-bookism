@@ -4,6 +4,9 @@ import { supabase } from '../supabase.js'
 import '../discover.css'
 import '../dictionary.css'
 
+const TARGET_WORDS = 10000
+const FRENCH_DATA_URL = 'https://raw.githubusercontent.com/WhiteHades/wikitionary-dictionary-json/main/dist/French'
+
 const FALLBACK_ENTRIES = [
   { word: 'Persévérance', type: 'Mot difficile', definition: 'Le fait de continuer malgré les difficultés ou les obstacles.', example: 'Sa persévérance lui a permis de terminer son projet.', tags: ['Français', 'Vie quotidienne'] },
   { word: 'Éloquent', type: 'Mot difficile', definition: 'Qui s’exprime avec beaucoup de facilité et de force.', example: 'Son discours était clair et éloquent.', tags: ['Français'] },
@@ -20,24 +23,71 @@ const FALLBACK_ENTRIES = [
 ]
 
 const CATEGORIES = ['Tout', 'Mot difficile', 'Terme manga', 'Culture manga', 'Expression japonaise']
+const LETTERS = ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z']
+
+function normalizeEntry(item) {
+  const word = String(item?.word || '').trim()
+  const definition = String(item?.definition || '').trim()
+  if (!word || !definition) return null
+  return { word, type: 'Français', definition, example: '', tags: ['Français', item?.pos || ''] .filter(Boolean) }
+}
 
 export default function Dictionnaire() {
   const [entries, setEntries] = useState(FALLBACK_ENTRIES)
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Tout')
   const [selected, setSelected] = useState(null)
+  const [loadingLargeDictionary, setLoadingLargeDictionary] = useState(true)
+  const [dictionaryError, setDictionaryError] = useState('')
 
   useEffect(() => {
     let active = true
 
     async function loadDictionary() {
-      const { data, error } = await supabase
-        .from('dictionary_entries')
-        .select('id, word, type, definition, example, tags')
-        .order('word', { ascending: true })
+      const [supabaseResult] = await Promise.allSettled([
+        supabase.from('dictionary_entries').select('id, word, type, definition, example, tags').order('word', { ascending: true })
+      ])
 
-      if (!error && Array.isArray(data) && data.length && active) {
-        setEntries(data)
+      let combined = []
+      if (supabaseResult.status === 'fulfilled' && !supabaseResult.value.error && Array.isArray(supabaseResult.value.data)) {
+        combined = supabaseResult.value.data
+      }
+
+      const existing = new Set(combined.map(item => String(item.word || '').toLocaleLowerCase('fr-FR')))
+
+      try {
+        // Import progressif d’un vrai corpus français dérivé de Wiktionary.
+        // On s’arrête dès que 10 000 entrées utilisables sont chargées afin d’éviter
+        // de télécharger inutilement toute la base qui contient beaucoup plus d’entrées.
+        for (const letter of LETTERS) {
+          if (!active || combined.length >= TARGET_WORDS) break
+          const response = await fetch(`${FRENCH_DATA_URL}/${letter}.json`)
+          if (!response.ok) continue
+          const data = await response.json()
+          if (!Array.isArray(data)) continue
+
+          for (const item of data) {
+            if (combined.length >= TARGET_WORDS) break
+            const normalized = normalizeEntry(item)
+            if (!normalized) continue
+            const key = normalized.word.toLocaleLowerCase('fr-FR')
+            if (existing.has(key)) continue
+            existing.add(key)
+            combined.push({ ...normalized, id: `fr-${key}` })
+          }
+        }
+
+        if (active) {
+          setEntries(combined.length >= TARGET_WORDS ? combined : [...combined, ...FALLBACK_ENTRIES.filter(item => !existing.has(item.word.toLocaleLowerCase('fr-FR')))])
+          if (combined.length < TARGET_WORDS) setDictionaryError(`Le corpus distant a fourni ${combined.length} entrées disponibles pour le moment.`)
+        }
+      } catch (error) {
+        if (active) {
+          setDictionaryError('Le grand corpus français n’a pas pu être chargé. Les entrées enregistrées dans MIMOU restent disponibles.')
+          setEntries(combined.length ? combined : FALLBACK_ENTRIES)
+        }
+      } finally {
+        if (active) setLoadingLargeDictionary(false)
       }
     }
 
@@ -46,11 +96,11 @@ export default function Dictionnaire() {
   }, [])
 
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase()
+    const normalized = query.trim().toLocaleLowerCase('fr-FR')
     return entries.filter((entry) => {
       const matchesCategory = category === 'Tout' || entry.type === category
       const tags = Array.isArray(entry.tags) ? entry.tags : []
-      const haystack = `${entry.word} ${entry.definition} ${entry.example || ''} ${tags.join(' ')}`.toLowerCase()
+      const haystack = `${entry.word} ${entry.definition} ${entry.example || ''} ${tags.join(' ')}`.toLocaleLowerCase('fr-FR')
       return matchesCategory && (!normalized || haystack.includes(normalized))
     })
   }, [entries, query, category])
@@ -72,10 +122,10 @@ export default function Dictionnaire() {
       <section className="home-hero-v2 dictionary-hero">
         <div className="landing-badge hero-badge-v2">📖 MIMOU DICTIONNAIRE</div>
         <h1>Comprends chaque mot.<br /><span>Profite de chaque histoire.</span></h1>
-        <p className="hero-lead-v2">Un espace simple pour expliquer les mots compliqués, les expressions et les termes que tu rencontres dans les mangas.</p>
+        <p className="hero-lead-v2">Un dictionnaire français enrichi avec un grand corpus de définitions, ainsi que les termes et expressions utiles aux lecteurs de mangas.</p>
         <div className="dictionary-search-wrap">
           <span>⌕</span>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher un mot, une expression ou un terme manga..." aria-label="Rechercher dans le dictionnaire" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Rechercher parmi 10 000+ mots, expressions ou termes..." aria-label="Rechercher dans le dictionnaire" />
           {query && <button type="button" onClick={() => setQuery('')} aria-label="Effacer la recherche">×</button>}
         </div>
       </section>
@@ -83,8 +133,11 @@ export default function Dictionnaire() {
       <section className="dictionary-content">
         <div className="dictionary-intro">
           <div><span className="world-kicker">APPRENDRE SANS SE PERDRE</span><h2>Le mot te bloque ?<br /><em>On te l’explique simplement.</em></h2></div>
-          <p>{filtered.length} entrée{filtered.length > 1 ? 's' : ''} disponible{filtered.length > 1 ? 's' : ''}</p>
+          <div className="dictionary-count-box"><strong>{entries.length.toLocaleString('fr-FR')}</strong><span>{entries.length >= TARGET_WORDS ? 'mots et définitions' : 'entrées chargées'}</span></div>
         </div>
+
+        {loadingLargeDictionary && <div className="dictionary-loading"><span className="dictionary-spinner" /> Chargement du grand dictionnaire français…</div>}
+        {dictionaryError && !loadingLargeDictionary && <div className="dictionary-source-note">ℹ️ {dictionaryError}</div>}
 
         <div className="dictionary-tabs" role="tablist" aria-label="Catégories">
           {CATEGORIES.map((item) => <button key={item} type="button" className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>{item}</button>)}
@@ -96,7 +149,7 @@ export default function Dictionnaire() {
               <div className="dictionary-card-top"><span>{entry.type}</span><b>→</b></div>
               <h3>{entry.word}</h3>
               <p>{entry.definition}</p>
-              <div className="dictionary-tags">{(Array.isArray(entry.tags) ? entry.tags : []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+              <div className="dictionary-tags">{(Array.isArray(entry.tags) ? entry.tags : []).filter(Boolean).slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</div>
             </button>
           ))}
         </div>
@@ -117,9 +170,9 @@ export default function Dictionnaire() {
             <button type="button" className="dictionary-modal-close" onClick={() => setSelected(null)} aria-label="Fermer">×</button>
             <span className="world-kicker">{selected.type}</span>
             <h2 id="dictionary-modal-title">{selected.word}</h2>
-            <div className="dictionary-definition"><strong>Définition simple</strong><p>{selected.definition}</p></div>
-            <div className="dictionary-example"><strong>Exemple</strong><p>{selected.example || 'Aucun exemple ajouté pour le moment.'}</p></div>
-            <div className="dictionary-tags">{(Array.isArray(selected.tags) ? selected.tags : []).map((tag) => <span key={tag}>{tag}</span>)}</div>
+            <div className="dictionary-definition"><strong>Définition</strong><p>{selected.definition}</p></div>
+            {selected.example && <div className="dictionary-example"><strong>Exemple</strong><p>{selected.example}</p></div>}
+            <div className="dictionary-tags">{(Array.isArray(selected.tags) ? selected.tags : []).filter(Boolean).map((tag) => <span key={tag}>{tag}</span>)}</div>
           </section>
         </div>
       )}
