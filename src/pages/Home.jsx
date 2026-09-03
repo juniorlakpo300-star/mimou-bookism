@@ -12,9 +12,8 @@ export default function Home() {
     }
 
     try {
-      if (navigator.share) {
-        await navigator.share(shareData)
-      } else {
+      if (navigator.share) await navigator.share(shareData)
+      else {
         await navigator.clipboard.writeText(PUBLIC_SITE_URL)
         alert('Lien du site copié !')
       }
@@ -23,9 +22,7 @@ export default function Home() {
         try {
           await navigator.clipboard.writeText(PUBLIC_SITE_URL)
           alert('Lien du site copié !')
-        } catch {
-          // Rien à faire si le navigateur bloque le presse-papiers.
-        }
+        } catch {}
       }
     }
   }
@@ -41,23 +38,27 @@ export default function Home() {
       </header>
 
       <section className="landing-hero">
-        <div className="landing-badge">📚 BIBLIOTHÈQUE NUMÉRIQUE</div>
-        <h1>Bienvenue sur<br /><span>MIMOU BOOKISM</span></h1>
-        <p>Découvrez, lisez et partagez des livres dans un espace pensé pour les passionnés de lecture.</p>
-        <Link to="/choix" className="landing-enter">Entrer dans MIMOU BOOKISM <span>→</span></Link>
+        <div className="landing-badge">📚 MIMOU BOOKISM</div>
+        <h1>Bienvenue sur<br /><span>TON ESPACE DE LECTURE</span></h1>
+        <p>Découvre une bibliothèque de livres et une mangathèque réunies dans MIMOU BOOKISM.</p>
       </section>
 
       <section className="landing-options">
-        <Link to="/catalogue?access=free" className="access-card free-card">
-          <div className="access-icon">📖</div>
-          <div><span className="access-label">ACCÈS LIBRE</span><h2>Livres gratuits</h2><p>Lisez les livres gratuits sans créer de compte.</p></div>
+        <Link to="/livres" className="access-card free-card">
+          <div className="access-icon">📚</div>
+          <div><span className="access-label">BIBLIOTHÈQUE</span><h2>Livres</h2><p>Romans, contes, poésie, essais et autres œuvres littéraires.</p></div>
           <strong>→</strong>
         </Link>
-        <Link to="/catalogue?access=premium" className="access-card premium-card">
-          <div className="access-icon">👑</div>
-          <div><span className="access-label">PREMIUM</span><h2>Livres Premium</h2><p>Découvrez l'espace Premium de MIMOU BOOKISM.</p></div>
+
+        <Link to="/mangas" className="access-card premium-card">
+          <div className="access-icon">🗯️</div>
+          <div><span className="access-label">MANGATHÈQUE</span><h2>Mangas</h2><p>Retrouve les mangas, leurs tomes et leurs chapitres dans un espace dédié.</p></div>
           <strong>→</strong>
         </Link>
+      </section>
+
+      <section style={{ maxWidth: 900, margin: '0 auto', padding: '0 20px 60px', textAlign: 'center' }}>
+        <Link to="/choix" className="landing-enter">Entrer dans MIMOU BOOKISM <span>→</span></Link>
       </section>
     </main>
   )
