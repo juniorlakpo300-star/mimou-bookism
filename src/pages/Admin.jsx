@@ -14,6 +14,7 @@ export default function Admin() {
   const [loginError, setLoginError] = useState('')
   const [books, setBooks] = useState([])
   const [comments, setComments] = useState([])
+  const [ratingsCount, setRatingsCount] = useState(0)
   const [loading, setLoading] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -28,6 +29,7 @@ export default function Admin() {
       setAccessGranted(true)
       loadBooks()
       loadComments()
+      loadRatingsCount()
     }
   }, [authLoading, user])
 
@@ -45,6 +47,16 @@ export default function Admin() {
     if (commentsError) setError(commentsError.message)
     else setComments(data || [])
     setCommentsLoading(false)
+  }
+
+  async function loadRatingsCount() {
+    const { count, error: ratingsError } = await supabase.from('book_ratings').select('id', { count: 'exact', head: true })
+    if (ratingsError) {
+      // La table peut ne pas encore être créée sur Supabase : le tableau de bord reste utilisable.
+      setRatingsCount(0)
+      return
+    }
+    setRatingsCount(count || 0)
   }
 
   async function handleLogin(e) {
@@ -69,7 +81,7 @@ export default function Admin() {
     }
     setAccessGranted(true)
     setPassword('')
-    await Promise.all([loadBooks(), loadComments()])
+    await Promise.all([loadBooks(), loadComments(), loadRatingsCount()])
   }
 
   async function handleLogoutAdmin() {
@@ -77,6 +89,7 @@ export default function Admin() {
     setAccessGranted(false)
     setBooks([])
     setComments([])
+    setRatingsCount(0)
     setSearch('')
     setCategory('Toutes')
     setCommentSearch('')
@@ -154,8 +167,18 @@ export default function Admin() {
   }, [comments, commentSearch])
 
   const mangaCount = books.filter(book => String(book.category || '').toLowerCase().startsWith('manga •')).length
+  const bookCount = books.length - mangaCount
   const freeCount = books.filter(book => book.is_free).length
+  const premiumCount = books.length - freeCount
   const totalViews = books.reduce((sum, book) => sum + Number(book.views_count || 0), 0)
+
+  const topBooks = useMemo(() => {
+    return [...books]
+      .sort((a, b) => Number(b.views_count || 0) - Number(a.views_count || 0))
+      .slice(0, 5)
+  }, [books])
+
+  const newestBooks = useMemo(() => books.slice(0, 5), [books])
 
   if (authLoading) return <div className="state">Vérification de l'accès...</div>
 
@@ -179,7 +202,32 @@ export default function Admin() {
       <header className="header"><Link to="/" className="brand">MIMOU <span>BOOKISM</span></Link><nav className="nav"><Link to="/catalogue" className="btn">Catalogue</Link><Link to="/publier" className="btn primary">+ Publier</Link><button onClick={handleLogoutAdmin} className="btn danger">Déconnexion</button></nav></header>
       <section className="dashboard-hero admin-hero"><p className="eyebrow">ADMINISTRATION</p><h1>Tableau de bord</h1><p>Publications, statistiques et modération de MIMOU BOOKISM.</p></section>
       {error && <div className="notice error-box">Erreur : {error}</div>}
-      <div className="stats-row"><div className="stat-card"><strong>{books.length}</strong><span>Publications</span></div><div className="stat-card"><strong>{mangaCount}</strong><span>Mangas</span></div><div className="stat-card"><strong>{freeCount}</strong><span>Gratuits</span></div><div className="stat-card"><strong>{totalViews}</strong><span>Lectures</span></div><div className="stat-card"><strong>{comments.length}</strong><span>Commentaires</span></div></div>
+
+      <section className="admin-stats-section">
+        <div className="catalogue-heading"><div><p className="section-kicker">VUE D’ENSEMBLE</p><h2>Statistiques</h2></div><span className="result-count">Données en direct</span></div>
+        <div className="stats-row admin-stats-grid">
+          <div className="stat-card stat-primary"><strong>{books.length}</strong><span>Publications</span></div>
+          <div className="stat-card"><strong>{bookCount}</strong><span>📚 Livres</span></div>
+          <div className="stat-card"><strong>{mangaCount}</strong><span>🗯️ Mangas</span></div>
+          <div className="stat-card"><strong>{totalViews}</strong><span>👁️ Lectures</span></div>
+          <div className="stat-card"><strong>{comments.length}</strong><span>💬 Commentaires</span></div>
+          <div className="stat-card"><strong>{ratingsCount}</strong><span>⭐ Notes</span></div>
+          <div className="stat-card"><strong>{freeCount}</strong><span>🟢 Gratuits</span></div>
+          <div className="stat-card"><strong>{premiumCount}</strong><span>👑 Premium</span></div>
+        </div>
+      </section>
+
+      <section className="admin-insights-grid">
+        <article className="admin-insight-card">
+          <div className="catalogue-heading"><div><p className="section-kicker">POPULARITÉ</p><h2>Œuvres les plus lues</h2></div></div>
+          {topBooks.length === 0 ? <p className="muted">Aucune publication pour le moment.</p> : <div className="admin-ranking-list">{topBooks.map((book, index) => <div className="admin-ranking-row" key={book.id}><span className="ranking-number">{index + 1}</span><img src={book.cover_url || BOOK_FALLBACK} alt="" /><div><strong>{book.title || 'Sans titre'}</strong><span>{String(book.category || '').toLowerCase().startsWith('manga •') ? '🗯️ Manga' : '📚 Livre'}</span></div><b>👁️ {Number(book.views_count || 0)}</b></div>)}</div>}
+        </article>
+        <article className="admin-insight-card">
+          <div className="catalogue-heading"><div><p className="section-kicker">NOUVEAUTÉS</p><h2>Dernières publications</h2></div></div>
+          {newestBooks.length === 0 ? <p className="muted">Aucune publication pour le moment.</p> : <div className="admin-ranking-list">{newestBooks.map(book => <div className="admin-ranking-row newest-row" key={book.id}><img src={book.cover_url || BOOK_FALLBACK} alt="" /><div><strong>{book.title || 'Sans titre'}</strong><span>{book.author || 'Auteur inconnu'}</span></div><b>{book.created_at ? new Date(book.created_at).toLocaleDateString('fr-FR') : '—'}</b></div>)}</div>}
+        </article>
+      </section>
+
       <section className="admin-filters"><div className="search-box"><label htmlFor="admin-search">Rechercher une publication</label><input id="admin-search" type="search" value={search} onChange={e => setSearch(e.target.value)} placeholder="Titre, auteur ou catégorie..." /></div><div className="filter-box"><label htmlFor="admin-category">Catégorie</label><select id="admin-category" value={category} onChange={e => setCategory(e.target.value)}>{categories.map(item => <option key={item} value={item}>{item}</option>)}</select></div></section>
       <div className="admin-results-info">{filteredBooks.length} publication{filteredBooks.length !== 1 ? 's' : ''}</div>
       <section className="admin-list">{loading ? <div className="state">Chargement...</div> : filteredBooks.length === 0 ? <div className="empty-card"><h2>Aucune publication</h2><p>Essayez une autre recherche.</p></div> : filteredBooks.map(book => { const isManga = String(book.category || '').toLowerCase().startsWith('manga •'); return <article className="admin-row" key={book.id}><img src={book.cover_url || BOOK_FALLBACK} alt={`Couverture de ${book.title || 'publication'}`} /><div className="admin-info"><span className="badge">{isManga ? '🗯️ MANGA' : '📚 LIVRE'} · {book.category || 'Sans catégorie'}</span><h2>{book.title || 'Sans titre'}</h2><p>{book.author || 'Auteur inconnu'}</p><small>👁️ {Number(book.views_count || 0)} lecture(s) · ID {book.id}</small></div><div className="admin-actions"><Link to={`/read/${book.id}`} className="btn">Ouvrir</Link><button className="btn danger" onClick={() => deleteBook(book)} disabled={deleting === book.id}>{deleting === book.id ? 'Suppression...' : 'Supprimer'}</button></div></article> })}</section>
