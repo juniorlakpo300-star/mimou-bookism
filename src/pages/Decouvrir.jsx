@@ -19,6 +19,7 @@ export default function Decouvrir() {
   const [lastRead, setLastRead] = useState(null)
   const [newSinceVisit, setNewSinceVisit] = useState(0)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [notificationsRead, setNotificationsRead] = useState(false)
   const [rewards, setRewards] = useState(() => readObject(REWARDS_KEY))
   const favoriteIds = readIds(FAVORITES_KEY)
   const bookmarks = readObject(BOOKMARKS_KEY)
@@ -30,8 +31,9 @@ export default function Decouvrir() {
     async function load() {
       const { data, error } = await supabase.from('books').select('id,title,author,category,description,cover_url,created_at,views_count,is_free').order('created_at', { ascending: false })
       if (!error) {
-        setWorks(data || [])
-        setNewSinceVisit(previousVisit ? (data || []).filter(w => new Date(w.created_at).getTime() > previousVisit).length : 0)
+        const list = data || []
+        setWorks(list)
+        setNewSinceVisit(previousVisit ? list.filter(w => new Date(w.created_at).getTime() > previousVisit).length : 0)
       }
       localStorage.setItem(VISIT_KEY, String(Date.now()))
       setLoading(false)
@@ -52,6 +54,10 @@ export default function Decouvrir() {
   const trends = useMemo(() => [...works].sort((a,b) => Number(b.views_count || 0) - Number(a.views_count || 0)).slice(0, 5), [works])
   const favorites = useMemo(() => favoriteIds.map(id => works.find(work => work.id === id)).filter(Boolean), [works, favoriteIds])
   const savedBookmarks = useMemo(() => Object.values(bookmarks).map(item => works.find(work => work.id === item.id) || item).filter(Boolean), [works, bookmarks])
+  const notificationItems = useMemo(() => {
+    const previousVisit = Number(localStorage.getItem(VISIT_KEY) || 0)
+    return previousVisit ? works.filter(work => new Date(work.created_at).getTime() > previousVisit).slice(0, 5) : []
+  }, [works, newSinceVisit])
   const readCount = Number(localStorage.getItem('mimou_bookism_read_count') || 0)
   const progressMap = readObject(PROGRESS_KEY)
   const completedCount = Object.values(progressMap).filter(value => Number(value) >= 100).length
@@ -74,6 +80,12 @@ export default function Decouvrir() {
   const isManga = work => String(work?.category || '').toLowerCase().startsWith('manga •')
   const typeLabel = work => isManga(work) ? '🗯️ MANGA' : '📚 LIVRE'
 
+  function markNotificationsRead() {
+    setNotificationsRead(true)
+    setNewSinceVisit(0)
+    localStorage.setItem(VISIT_KEY, String(Date.now()))
+  }
+
   if (loading) return <div className="state">Préparation de la découverte...</div>
 
   return (
@@ -92,8 +104,8 @@ export default function Decouvrir() {
         </section>
 
         <section className="discover-notification-bar">
-          <button type="button" className="notification-button" onClick={() => setShowNotifications(v => !v)}>🔔 Notifications {newSinceVisit > 0 && <b>{newSinceVisit}</b>}</button>
-          {showNotifications && <div className="notification-popover"><strong>Depuis ta dernière visite</strong>{newSinceVisit ? <p>🆕 {newSinceVisit} nouvelle{newSinceVisit > 1 ? 's' : ''} publication{newSinceVisit > 1 ? 's' : ''} à découvrir.</p> : <p>Tu es à jour. Rien de nouveau pour le moment.</p>}</div>}
+          <button type="button" className={`notification-button ${newSinceVisit > 0 && !notificationsRead ? 'has-new' : ''}`} onClick={() => setShowNotifications(v => !v)}>🔔 Notifications {newSinceVisit > 0 && !notificationsRead && <b>{newSinceVisit}</b>}</button>
+          {showNotifications && <div className="notification-popover"><div className="notification-popover-head"><strong>Depuis ta dernière visite</strong><button type="button" className="notification-read-btn" onClick={markNotificationsRead}>Tout marquer comme lu</button></div>{notificationItems.length ? notificationItems.map(work => <Link key={work.id} to={`/read/${work.id}`} className="notification-item"><span>🆕</span><div><strong>{work.title || 'Nouvelle œuvre'}</strong><small>{isManga(work) ? 'Nouveau manga' : 'Nouveau livre'} · {work.author || 'Auteur inconnu'}</small></div></Link>) : <p>{newSinceVisit ? 'De nouvelles publications sont disponibles.' : 'Tu es à jour. Rien de nouveau pour le moment.'}</p>}</div>}
         </section>
 
         {lastRead && works.some(work => work.id === lastRead.id) && <section className="continue-card"><div className="continue-cover"><img src={lastRead.cover_url || FALLBACK_COVER} alt="" loading="lazy" /></div><div><span className="section-kicker">REPRENDRE MA LECTURE</span><h2>{lastRead.title}</h2><p>Continue ton aventure là où tu t'es arrêté.</p><div className="continue-progress"><div className="continue-progress-heading"><span>Progression</span><strong>{progress}%</strong></div><div className="continue-progress-track" aria-hidden="true"><div className="continue-progress-fill" style={{ width: `${progress}%` }} /></div></div><Link to={`/read/${lastRead.id}`} className="btn primary">📖 Continuer</Link></div></section>}
@@ -102,7 +114,9 @@ export default function Decouvrir() {
 
         <section className="discover-section"><div className="discover-heading"><div><span>🔥 TENDANCES</span><h2>Les œuvres les plus lues</h2></div><span>Top {trends.length}</span></div>{trends.length ? <div className="discover-grid">{trends.map((work,index) => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt="" loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>#{index + 1} · {typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'} · 👁️ {Number(work.views_count || 0)} lecture(s)</p></div></Link>)}</div> : <div className="empty-card"><p>Les tendances apparaîtront après les premières lectures.</p></div>}</section>
 
-        <section className="discover-section"><div className="discover-heading"><div><span>NOUVEAUTÉS</span><h2>Les dernières publications</h2></div><span>{newest.length} œuvres</span></div>{newest.length === 0 ? <div className="empty-card"><h2>Pas encore de publication</h2></div> : <div className="discover-grid">{newest.map(work => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt={`Couverture de ${work.title || 'œuvre'}`} loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>{typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'}</p></div></Link>)}</div>}</section>
+        <section className="discover-section"><div className="discover-heading"><div><span>✨ NOUVEAUTÉS</span><h2>Les dernières publications</h2></div><span>{newest.length} œuvres</span></div>{newest.length === 0 ? <div className="empty-card"><h2>Pas encore de publication</h2></div> : <div className="discover-grid">{newest.map(work => <Link key={work.id} to={`/read/${work.id}`} className="discover-card"><div className="discover-cover"><img src={work.cover_url || FALLBACK_COVER} alt={`Couverture de ${work.title || 'œuvre'}`} loading="lazy" onError={e => { e.currentTarget.src = FALLBACK_COVER }} /><span>{typeLabel(work)}</span></div><div className="discover-info"><h3>{work.title || 'Sans titre'}</h3><p>{work.author || 'Auteur inconnu'}</p></div></Link>)}</div>}</section>
+
+        <section className="discover-section"><div className="discover-heading"><div><span>🕘 HISTORIQUE RÉCENT</span><h2>Ta dernière lecture</h2></div><span>Reprise rapide</span></div>{lastRead && works.some(work => work.id === lastRead.id) ? <div className="history-discover-card"><img src={lastRead.cover_url || FALLBACK_COVER} alt="" loading="lazy" /><div><span className="section-kicker">{progress >= 100 ? 'LECTURE TERMINÉE' : 'EN COURS'}</span><h3>{lastRead.title}</h3><p>Progression enregistrée : <strong>{progress}%</strong></p><Link to={`/read/${lastRead.id}`} className="btn primary">{progress >= 100 ? '📖 Relire' : '▶️ Reprendre'}</Link></div></div> : <div className="empty-card"><h2>Aucune lecture récente</h2><p>Ouvre une œuvre pour commencer ton historique.</p><div><Link to="/livres" className="btn primary">📚 Choisir un livre</Link> <Link to="/mangas" className="btn">🗯️ Choisir un manga</Link></div></div>}</section>
 
         <section className="discover-section"><div className="discover-heading"><div><span>🏆 TES BADGES</span><h2>Ta collection de récompenses</h2></div><span>{unlockedBadges}/{badges.length} débloqués</span></div><div className="badge-showcase">{badges.map(badge => <div key={badge.id} className={`reader-badge ${badge.unlocked ? 'unlocked' : ''}`}><span className="badge-icon">{badge.icon}</span><strong>{badge.title}</strong><small>{badge.unlocked ? '✓ Débloqué' : badge.text}</small></div>)}</div></section>
 
