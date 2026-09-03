@@ -5,6 +5,12 @@ import { supabase } from '../supabase'
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 const PSEUDO_KEY = 'mimou_bookism_pseudo'
 const SECTION_KEY = 'mimou_bookism_section'
+const FAVORITES_KEY = 'mimou_bookism_favorites'
+const LAST_READ_KEY = 'mimou_bookism_last_read'
+
+function getFavorites() {
+  try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
+}
 
 export default function Reader() {
   const { id } = useParams()
@@ -12,6 +18,7 @@ export default function Reader() {
   const [comments, setComments] = useState([])
   const [pseudo, setPseudo] = useState(() => localStorage.getItem(PSEUDO_KEY) || '')
   const [comment, setComment] = useState('')
+  const [favorites, setFavorites] = useState(getFavorites)
   const [loading, setLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState('')
   const [sending, setSending] = useState(false)
@@ -31,6 +38,7 @@ export default function Reader() {
 
         const manga = String(bookData?.category || '').toLowerCase().startsWith('manga •')
         localStorage.setItem(SECTION_KEY, manga ? 'manga' : 'books')
+        localStorage.setItem(LAST_READ_KEY, JSON.stringify({ id: bookData.id, title: bookData.title, cover_url: bookData.cover_url, at: Date.now() }))
 
         const filePath = bookData?.file_path || `${bookData?.id || id}.pdf`
         const { data: signedData, error: signedError } = await supabase.storage
@@ -98,6 +106,12 @@ export default function Reader() {
     setSending(false)
   }
 
+  function toggleFavorite() {
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]
+    setFavorites(next)
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
+  }
+
   if (loading) return <div className="state">Chargement...</div>
   if (error && !book) return <div className="state error">Erreur : {error}</div>
   if (!book) return <div className="state">Œuvre introuvable.</div>
@@ -106,6 +120,7 @@ export default function Reader() {
   const theme = isManga ? 'manga-reader' : 'books-reader'
   const backPath = isManga ? '/mangas' : '/livres'
   const typeLabel = isManga ? 'Manga' : 'Livre'
+  const isFavorite = favorites.includes(id)
 
   return (
     <main className={`reader ${theme}`}>
@@ -123,6 +138,9 @@ export default function Reader() {
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
 
         <div className="reader-actions">
+          <button type="button" className={`btn ${isFavorite ? 'favorite-reading' : ''}`} onClick={toggleFavorite}>
+            {isFavorite ? '❤️ Dans ma bibliothèque' : '♡ Ajouter à ma bibliothèque'}
+          </button>
           {pdfUrl ? (
             <>
               <a className="btn primary" href={pdfUrl} target="_blank" rel="noreferrer">📖 Lire le {typeLabel}</a>
