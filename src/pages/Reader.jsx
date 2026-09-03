@@ -4,6 +4,7 @@ import { supabase } from '../supabase'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 const PSEUDO_KEY = 'mimou_bookism_pseudo'
+const SECTION_KEY = 'mimou_bookism_section'
 
 export default function Reader() {
   const { id } = useParams()
@@ -27,6 +28,9 @@ export default function Reader() {
         setError(bookError.message)
       } else {
         setBook(bookData)
+
+        const manga = String(bookData?.category || '').toLowerCase().startsWith('manga •')
+        localStorage.setItem(SECTION_KEY, manga ? 'manga' : 'books')
 
         const filePath = bookData?.file_path || `${bookData?.id || id}.pdf`
         const { data: signedData, error: signedError } = await supabase.storage
@@ -113,15 +117,9 @@ export default function Reader() {
           {book.author || (isManga ? 'Mangaka inconnu' : 'Auteur inconnu')} {book.category ? `• ${book.category}` : ''} • Gratuit
         </p>
 
-        <img
-          className="reader-cover"
-          src={book.cover_url || FALLBACK_COVER}
-          alt={`Couverture de ${book.title}`}
-          onError={e => { e.currentTarget.src = FALLBACK_COVER }}
-        />
+        <img className="reader-cover" src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title}`} onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
 
         {book.description && <p className="reader-description">{book.description}</p>}
-
         {error && <p className="error" style={{ marginBottom: 16 }}>{error}</p>}
 
         <div className="reader-actions">
@@ -135,9 +133,7 @@ export default function Reader() {
           )}
         </div>
 
-        {pdfUrl && (
-          <iframe className="pdf-frame" src={pdfUrl} title={`Lecture de ${book.title}`} />
-        )}
+        {pdfUrl && <iframe className="pdf-frame" src={pdfUrl} title={`Lecture de ${book.title}`} />}
 
         <section className="comments">
           <h2>💬 Commentaires</h2>
