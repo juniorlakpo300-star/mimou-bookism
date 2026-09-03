@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import './discover.css'
 
 import Home from './pages/Home'
 import Choix from './pages/Choix'
