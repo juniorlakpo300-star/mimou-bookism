@@ -26,17 +26,12 @@ export default function Publier() {
       const author = form.author.value.trim() || 'Auteur inconnu'
       const category = form.category.value
       const description = form.description.value.trim()
-      const price = Number(form.price.value || 0)
-      const isFree = form.is_free.checked
       const cover = form.cover.files[0]
       const pdf = form.pdf.files[0]
 
       if (!title) throw new Error('Indique le titre du livre.')
       if (!cover || !pdf) throw new Error('Choisis une couverture et un fichier PDF.')
       if (pdf.type !== 'application/pdf') throw new Error('Le livre doit être un fichier PDF.')
-      if (!isFree && (price <= 0 || !Number.isInteger(price) || price % 5 !== 0)) {
-        throw new Error('Pour un livre payant, le prix doit être un nombre entier et un multiple de 5 FCFA.')
-      }
 
       const id = crypto.randomUUID()
       const coverExt = cover.name.split('.').pop()?.toLowerCase() || 'jpg'
@@ -58,8 +53,8 @@ export default function Publier() {
         author,
         category: category || null,
         description: description || null,
-        price: isFree ? 0 : price,
-        is_free: isFree,
+        price: 0,
+        is_free: true,
         cover_url: coverData.publicUrl,
         file_path: pdfPath,
         book_url: null,
@@ -67,7 +62,7 @@ export default function Publier() {
       })
       if (insertError) throw insertError
 
-      alert('✅ Livre publié avec succès !')
+      alert('✅ Livre gratuit publié avec succès !')
       navigate(`/read/${id}`)
     } catch (err) {
       console.error(err)
@@ -88,28 +83,24 @@ export default function Publier() {
           <Link to="/ecrivain" className="btn secondary">Mes publications</Link>
         </div>
         <h1>Publier un livre</h1>
-        <p className="form-intro">Partage ton œuvre avec les lecteurs de MIMOU BOOKISM.</p>
+        <p className="form-intro">Partage gratuitement ton œuvre avec les lecteurs de MIMOU BOOKISM.</p>
 
         <form onSubmit={handleSubmit}>
           <div className="form-row">
             <label className="field"><span>Titre *</span><input name="title" placeholder="Titre du livre" required /></label>
             <label className="field"><span>Auteur</span><input name="author" placeholder="Nom de l'auteur" /></label>
           </div>
-          <div className="form-row">
-            <label className="field">
-              <span>Catégorie *</span>
-              <select name="category" defaultValue="" required>
-                <option value="" disabled>Choisir un genre littéraire</option>
-                {LITERARY_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-              </select>
-            </label>
-            <label className="field"><span>Prix (FCFA)</span><input name="price" type="number" min="0" step="1" defaultValue="0" /></label>
-          </div>
+          <label className="field">
+            <span>Catégorie *</span>
+            <select name="category" defaultValue="" required>
+              <option value="" disabled>Choisir un genre littéraire</option>
+              {LITERARY_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
           <label className="field"><span>Description</span><textarea name="description" rows="4" placeholder="Présente brièvement le livre..." /></label>
-          <label className="check-field"><input name="is_free" type="checkbox" defaultChecked /> Livre gratuit</label>
           <label className="field"><span>Couverture *</span><input name="cover" type="file" accept="image/*" required /></label>
           <label className="field"><span>Fichier PDF *</span><input name="pdf" type="file" accept="application/pdf,.pdf" required /></label>
-          <button className="btn primary full" type="submit" disabled={loading}>{loading ? 'Publication en cours...' : 'Publier le livre'}</button>
+          <button className="btn primary full" type="submit" disabled={loading}>{loading ? 'Publication en cours...' : 'Publier gratuitement'}</button>
         </form>
       </div>
     </main>
