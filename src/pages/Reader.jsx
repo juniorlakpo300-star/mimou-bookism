@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { supabase } from '../supabase'
-import { useAuth } from '../AuthContext.jsx'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
+const PSEUDO_KEY = 'mimou_bookism_pseudo'
 
 export default function Reader() {
   const { id } = useParams()
-  const { user } = useAuth()
   const [book, setBook] = useState(null)
   const [comments, setComments] = useState([])
+  const [pseudo, setPseudo] = useState(() => localStorage.getItem(PSEUDO_KEY) || '')
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState('')
@@ -56,21 +56,43 @@ export default function Reader() {
 
   async function addComment(event) {
     event.preventDefault()
-    if (!user) return
 
+    const cleanPseudo = pseudo.trim()
     const content = comment.trim()
-    if (!content) return
+
+    if (cleanPseudo.length < 2) {
+      alert('Ton pseudo doit contenir au moins 2 caractères.')
+      return
+    }
+
+    if (cleanPseudo.length > 30) {
+      alert('Ton pseudo ne peut pas dépasser 30 caractères.')
+      return
+    }
+
+    if (!content) {
+      alert('Écris un commentaire avant de publier.')
+      return
+    }
+
+    if (content.length > 2000) {
+      alert('Le commentaire ne peut pas dépasser 2000 caractères.')
+      return
+    }
 
     setSending(true)
 
     const { data, error: insertError } = await supabase.from('comments').insert({
       book_id: id,
-      user_email: user.email,
+      user_email: cleanPseudo,
       content
     }).select().single()
 
-    if (insertError) alert(`Erreur : ${insertError.message}`)
-    else {
+    if (insertError) {
+      alert(`Impossible de publier le commentaire : ${insertError.message}`)
+    } else {
+      localStorage.setItem(PSEUDO_KEY, cleanPseudo)
+      setPseudo(cleanPseudo)
       setComments(prev => [data, ...prev])
       setComment('')
     }
@@ -123,34 +145,45 @@ export default function Reader() {
         )}
 
         <section className="comments">
-          <h2>Commentaires</h2>
+          <h2>💬 Commentaires</h2>
+          <p className="muted">Tu peux commenter sans créer de compte. Choisis simplement un pseudo.</p>
 
-          {user ? (
-            <form onSubmit={addComment} className="comment-form">
-              <p className="muted">Connecté en tant que <strong>{user.email}</strong></p>
-              <textarea
-                value={comment}
-                onChange={e => setComment(e.target.value)}
-                placeholder="Écris un commentaire..."
-                rows="3"
-                required
-              />
-              <button className="btn primary" disabled={sending}>
-                {sending ? 'Envoi...' : 'Commenter'}
-              </button>
-            </form>
-          ) : (
-            <p className="muted">
-              Tu dois être connecté pour commenter. <Link to="/connexion">Se connecter</Link>
-            </p>
-          )}
+          <form onSubmit={addComment} className="comment-form">
+            <label htmlFor="comment-pseudo">Votre pseudo</label>
+            <input
+              id="comment-pseudo"
+              type="text"
+              value={pseudo}
+              onChange={e => setPseudo(e.target.value)}
+              placeholder="Ex. Junior, Lecteur2026..."
+              minLength="2"
+              maxLength="30"
+              autoComplete="nickname"
+              required
+            />
+
+            <label htmlFor="comment-content">Votre commentaire</label>
+            <textarea
+              id="comment-content"
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="Écris ton commentaire sur ce livre..."
+              rows="4"
+              maxLength="2000"
+              required
+            />
+
+            <button type="submit" className="btn primary" disabled={sending}>
+              {sending ? 'Publication...' : '💬 Publier le commentaire'}
+            </button>
+          </form>
 
           <div className="comment-list">
             {comments.length === 0 ? (
-              <p className="muted">Aucun commentaire pour le moment.</p>
+              <p className="muted">Aucun commentaire pour le moment. Sois le premier à commenter !</p>
             ) : comments.map(item => (
               <article className="comment" key={item.id}>
-                <strong>{item.user_email}</strong>
+                <strong>{item.user_email || 'Lecteur'}</strong>
                 <p>{item.content}</p>
               </article>
             ))}
