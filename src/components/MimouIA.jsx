@@ -1,45 +1,42 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../supabase.js'
+import { supabase } from '../supabase'
 
 export default function MimouIA() {
   const [open, setOpen] = useState(false)
   const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: 'Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre.'
-    }
-  ])
   const [loading, setLoading] = useState(false)
-  const [books, setBooks] = useState([])
-  const [searchLoading, setSearchLoading] = useState(false)
   const [error, setError] = useState('')
+  const [books, setBooks] = useState([])
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: 'Bonjour 👋 Je suis Lia, ton assistante intelligente de MIMOU BOOKISM. Pose-moi une question, demande-moi une recommandation ou cherche un livre.' }
+  ])
 
-  async function searchBooks(query) {
-    const text = query.trim()
-    if (!text) return
+  useEffect(() => {
+    if (open) loadBooks()
+  }, [open])
 
-    setSearchLoading(true)
-    setBooks([])
-
-    const safeQuery = text.slice(0, 120).replace(/[%_,]/g, ' ')
-
-    const { data, error: searchError } = await supabase
+  async function loadBooks() {
+    const { data, error: booksError } = await supabase
       .from('books')
-      .select('id, title, author, category, description, cover_url, is_free')
-      .or(`title.ilike.%${safeQuery}%,author.ilike.%${safeQuery}%,category.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`)
-      .limit(3)
+      .select('id,title,author,category,description,cover_url')
+      .order('title', { ascending: true })
+      .limit(100)
 
-    if (searchError) {
-      setError('Impossible de rechercher les livres.')
-    } else if (!data || data.length === 0) {
-      setError('Je n’ai trouvé aucun livre correspondant.')
-    } else {
-      setBooks(data)
-    }
+    if (!booksError) setBooks(data || [])
+  }
 
-    setSearchLoading(false)
+  function searchLocalBooks(query) {
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+    if (!words.length) return []
+
+    return books.filter((book) => {
+      const text = [book.title, book.author, book.category, book.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+      return words.some((word) => text.includes(word))
+    }).slice(0, 3)
   }
 
   async function sendMessage() {
@@ -48,224 +45,102 @@ export default function MimouIA() {
 
     setMessage('')
     setError('')
-    setBooks([])
     setLoading(true)
 
-    // On ajoute uniquement le message utilisateur avant l'appel API.
-    setMessages(prev => [...prev, { role: 'user', content: text }])
+    setMessages((prev) => [...prev, { role: 'user', content: text }])
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ message: text, books })
       })
 
       const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || `Erreur du service IA (${response.status}).`)
 
-      if (!response.ok) {
-        throw new Error(data.error || `Erreur du service IA (${response.status}).`)
-      }
+      const reply = String(data.reply || '').trim()
+      if (!reply) throw new Error('Lia n’a pas reçu de réponse.')
 
-      const reply = typeof data.reply === 'string' ? data.reply.trim() : ''
+      setMessages((prev) => [...prev, { role: 'assistant', content: reply }])
 
-      if (!reply) {
-        throw new Error('Lia n’a reçu aucune réponse du service IA.')
-      }
-
-      // On ajoute la réponse complète en une seule fois : aucun streaming
-      // ni index calculé à l'avance ne peut couper la réponse.
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
+      const localResults = searchLocalBooks(text)
+      if (localResults.length) setBooks(localResults)
     } catch (err) {
-      console.error('Erreur Lia:', err)
-      setError(err.message || 'Erreur inconnue.')
-      setMessages(prev => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Désolée 😕 Je rencontre actuellement un problème pour me connecter au service IA.'
-        }
-      ])
+      setError(err?.message || 'Impossible de contacter Lia.')
+      setMessages((prev) => [...prev, { role: 'assistant', content: 'Désolée, je rencontre un petit problème. Réessaie dans un instant.' }])
     } finally {
       setLoading(false)
     }
-
-    const lowerText = text.toLowerCase()
-    const wantsBook =
-      lowerText.includes('livre') ||
-      lowerText.includes('roman') ||
-      lowerText.includes('auteur') ||
-      lowerText.includes('lecture') ||
-      lowerText.includes('business') ||
-      lowerText.includes('amour') ||
-      lowerText.includes('science') ||
-      lowerText.includes('développement')
-
-    if (wantsBook) {
-      searchBooks(text)
-    }
-  }
-
-  function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
-  }
-
-  function clearConversation() {
-    setMessages([
-      {
-        role: 'assistant',
-        content: 'Bonjour 👋 Je suis Lia. Comment puis-je t’aider aujourd’hui ?'
-      }
-    ])
-    setBooks([])
-    setError('')
   }
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(prev => !prev)} aria-label="Ouvrir Lia" style={{
-        position: 'fixed', right: '24px', bottom: '24px', zIndex: 99999,
-        display: 'flex', alignItems: 'center', gap: '9px', padding: '13px 19px',
-        border: '1px solid #475569', borderRadius: '999px', background: '#111827',
-        color: '#ffffff', fontSize: '15px', fontWeight: '700', cursor: 'pointer',
-        boxShadow: '0 15px 40px rgba(0,0,0,0.5)'
-      }}>
-        <span style={{
-          width: '28px', height: '28px', borderRadius: '50%', background: '#ffffff',
-          color: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontWeight: '900'
-        }}>✦</span>
-        Lia
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="fixed bottom-6 right-6 z-50 rounded-full bg-indigo-600 px-5 py-3 font-semibold text-white shadow-xl transition hover:bg-indigo-500"
+      >
+        {open ? 'Fermer Lia' : 'Lia'}
       </button>
 
       {open && (
-        <section style={{
-          position: 'fixed', right: '24px', bottom: '82px', zIndex: 99998,
-          width: '390px', maxWidth: 'calc(100vw - 30px)', height: '560px',
-          maxHeight: 'calc(100vh - 110px)', display: 'flex', flexDirection: 'column',
-          background: '#0b1220', color: '#e2e8f0', border: '1px solid #334155',
-          borderRadius: '20px', overflow: 'hidden', boxShadow: '0 25px 70px rgba(0,0,0,0.65)'
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '12px', padding: '16px',
-            background: '#111827', borderBottom: '1px solid #1e293b'
-          }}>
-            <div style={{
-              width: '42px', height: '42px', flexShrink: 0, borderRadius: '50%',
-              background: '#ffffff', color: '#0f172a', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', fontWeight: '900'
-            }}>L</div>
-
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <strong style={{ color: '#ffffff', fontSize: '15px' }}>Lia</strong>
-              <span style={{ color: '#94a3b8', fontSize: '11px' }}>Intelligence de MIMOU BOOKISM</span>
-            </div>
-
-            <button type="button" onClick={clearConversation} title="Nouvelle conversation" style={{
-              border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '18px', cursor: 'pointer', padding: '5px'
-            }}>↻</button>
-
-            <button type="button" onClick={() => setOpen(false)} aria-label="Fermer Lia" style={{
-              border: 'none', background: 'transparent', color: '#94a3b8', fontSize: '25px', cursor: 'pointer', padding: '2px'
-            }}>×</button>
+        <div className="fixed bottom-20 right-6 z-50 flex h-[620px] w-[390px] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-950 text-white shadow-2xl">
+          <div className="border-b border-slate-800 px-5 py-4">
+            <h2 className="text-lg font-bold">Lia</h2>
+            <p className="text-sm text-slate-400">Intelligence de MIMOU BOOKISM</p>
           </div>
 
-          <div style={{
-            flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px'
-          }}>
+          <div className="flex-1 space-y-3 overflow-y-auto p-4">
             {messages.map((item, index) => (
-              <div key={`${item.role}-${index}`} style={{
-                display: 'flex', justifyContent: item.role === 'user' ? 'flex-end' : 'flex-start'
-              }}>
-                <div style={{
-                  maxWidth: '84%', padding: '11px 13px',
-                  borderRadius: item.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                  background: item.role === 'user' ? '#1e293b' : '#111827',
-                  border: item.role === 'user' ? '1px solid #334155' : '1px solid #1e293b',
-                  color: '#f8fafc', fontSize: '13px', lineHeight: '1.55', whiteSpace: 'pre-wrap'
-                }}>
-                  {item.content}
-                </div>
+              <div key={`${item.role}-${index}`} className={item.role === 'user' ? 'ml-8 rounded-xl bg-indigo-600 p-3' : 'mr-8 rounded-xl bg-slate-800 p-3'}>
+                <p className="whitespace-pre-wrap text-sm leading-6">{item.content}</p>
               </div>
             ))}
 
-            {loading && (
-              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                <div style={{
-                  padding: '11px 13px', borderRadius: '16px 16px 16px 4px',
-                  background: '#111827', border: '1px solid #1e293b', color: '#94a3b8',
-                  fontSize: '13px'
-                }}>
-                  Lia écrit...
-                </div>
-              </div>
-            )}
+            {loading && <div className="mr-8 rounded-xl bg-slate-800 p-3 text-sm text-slate-400">Lia réfléchit…</div>}
 
-            {searchLoading && (
-              <div style={{ color: '#64748b', fontSize: '11px', paddingLeft: '4px' }}>Recherche de livres...</div>
-            )}
-
-            {error && (
-              <div style={{
-                color: '#fca5a5', fontSize: '12px', padding: '8px 10px', background: '#1f1720', borderRadius: '10px'
-              }}>{error}</div>
-            )}
+            {error && <p className="px-2 text-xs text-red-400">{error}</p>}
 
             {books.length > 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '9px' }}>
-                <span style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: '700' }}>📚 Livres trouvés</span>
-
-                {books.map(book => (
-                  <article key={book.id} style={{
-                    display: 'flex', gap: '11px', padding: '10px', border: '1px solid #1e293b',
-                    borderRadius: '13px', background: '#111827'
-                  }}>
-                    <img
-                      src={book.cover_url || 'https://placehold.co/80x110/111827/94a3b8?text=BOOK'}
-                      alt={`Couverture de ${book.title}`}
-                      style={{ width: '48px', height: '68px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
-                    />
-                    <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
-                      <strong style={{ color: '#ffffff', fontSize: '12px' }}>{book.title}</strong>
-                      <span style={{ color: '#94a3b8', fontSize: '11px' }}>{book.author || 'Auteur inconnu'}</span>
-                      <small style={{ color: '#64748b', fontSize: '10px' }}>{book.category || 'Sans catégorie'}</small>
-                      <Link to={`/read/${book.id}`} onClick={() => setOpen(false)} style={{
-                        color: '#ffffff', fontSize: '10px', fontWeight: '700', marginTop: '3px', textDecoration: 'none'
-                      }}>Ouvrir le livre →</Link>
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Livres du catalogue</p>
+                {books.slice(0, 3).map((book) => (
+                  <Link key={book.id} to={`/livre/${book.id}`} className="flex gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3 transition hover:border-indigo-500">
+                    {book.cover_url && <img src={book.cover_url} alt="" className="h-14 w-10 rounded object-cover" />}
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{book.title}</p>
+                      {book.author && <p className="truncate text-xs text-slate-400">{book.author}</p>}
+                      {book.category && <p className="truncate text-xs text-indigo-300">{book.category}</p>}
                     </div>
-                  </article>
+                  </Link>
                 ))}
               </div>
             )}
           </div>
 
-          <div style={{ padding: '12px', background: '#111827', borderTop: '1px solid #1e293b' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px' }}>
+          <form onSubmit={(event) => { event.preventDefault(); sendMessage() }} className="border-t border-slate-800 p-3">
+            <div className="flex gap-2">
               <textarea
                 value={message}
-                onChange={e => setMessage(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Écris à Lia..."
-                rows={1}
-                disabled={loading}
-                style={{
-                  flex: 1, minWidth: 0, resize: 'none', padding: '11px 12px',
-                  border: '1px solid #334155', borderRadius: '12px', background: '#020617',
-                  color: '#ffffff', outline: 'none', fontFamily: 'inherit', fontSize: '13px', lineHeight: '1.4'
+                onChange={(event) => setMessage(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault()
+                    sendMessage()
+                  }
                 }}
+                placeholder="Écris à Lia…"
+                rows={2}
+                disabled={loading}
+                className="min-w-0 flex-1 resize-none rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-indigo-500"
               />
-              <button type="button" onClick={sendMessage} disabled={loading || !message.trim()} style={{
-                width: '43px', height: '43px', flexShrink: 0, border: 'none', borderRadius: '12px',
-                background: loading || !message.trim() ? '#334155' : '#ffffff', color: '#0f172a',
-                fontSize: '19px', fontWeight: '900', cursor: loading || !message.trim() ? 'not-allowed' : 'pointer'
-              }}>↑</button>
+              <button type="submit" disabled={loading || !message.trim()} className="self-end rounded-xl bg-indigo-600 px-4 py-2 font-semibold disabled:cursor-not-allowed disabled:opacity-50">
+                Envoyer
+              </button>
             </div>
-            <div style={{ marginTop: '7px', color: '#64748b', fontSize: '9px', textAlign: 'center' }}>Lia • MIMOU BOOKISM</div>
-          </div>
-        </section>
+          </form>
+        </div>
       )}
     </>
   )
