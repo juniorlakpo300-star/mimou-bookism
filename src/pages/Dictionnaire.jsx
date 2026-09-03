@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import '../discover.css'
+import '../dictionary.css'
 
 const ENTRIES = [
   { word: 'Persévérance', type: 'Mot difficile', definition: 'Le fait de continuer malgré les difficultés ou les obstacles.', example: 'Sa persévérance lui a permis de terminer son projet.', tags: ['Français', 'Vie quotidienne'] },
@@ -15,10 +16,9 @@ const ENTRIES = [
   { word: 'Yōkai', type: 'Terme manga', definition: 'Créature ou esprit issu du folklore japonais. Le terme désigne une grande variété d’êtres surnaturels.', example: 'Certains mangas utilisent des yōkai comme personnages ou créatures.', tags: ['Japonais', 'Folklore'] },
   { word: 'Shōnen', type: 'Culture manga', definition: 'Catégorie éditoriale japonaise visant principalement un public adolescent masculin, souvent associée à l’aventure et à l’action.', example: 'De nombreux mangas d’aventure sont publiés dans des magazines shōnen.', tags: ['Manga', 'Culture'] },
   { word: 'Shōjo', type: 'Culture manga', definition: 'Catégorie éditoriale japonaise visant principalement un public adolescent féminin, souvent associée aux relations et aux émotions.', example: 'Les mangas shōjo peuvent mettre l’accent sur les relations entre personnages.', tags: ['Manga', 'Culture'] },
-  { word: 'Maniak', type: 'Expression manga', definition: 'Terme parfois utilisé pour désigner une personne passionnée ou très spécialisée dans un sujet. Le sens exact dépend du contexte.', example: 'Dans une œuvre, un personnage peut être décrit comme un vrai maniak d’un domaine.', tags: ['Manga', 'Expression'] },
 ]
 
-const CATEGORIES = ['Tout', 'Mot difficile', 'Terme manga', 'Culture manga', 'Expression manga']
+const CATEGORIES = ['Tout', 'Mot difficile', 'Terme manga', 'Culture manga']
 
 export default function Dictionnaire() {
   const [query, setQuery] = useState('')
