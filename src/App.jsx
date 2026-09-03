@@ -5,6 +5,7 @@ import Choix from './pages/Choix'
 import Catalogue from './pages/Catalogue'
 import Manga from './pages/Manga'
 import Favoris from './pages/Favoris'
+import Decouvrir from './pages/Decouvrir'
 import Publier from './pages/Publier'
 import Reader from './pages/Reader'
 import Ecrivain from './pages/Ecrivain'
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/catalogue" element={<Catalogue />} />
           <Route path="/mangas" element={<Manga />} />
           <Route path="/favoris" element={<Favoris />} />
+          <Route path="/decouvrir" element={<Decouvrir />} />
           <Route path="/publier" element={<Publier />} />
           <Route path="/ecrivain" element={<Ecrivain />} />
           <Route path="/admin" element={<Admin />} />
