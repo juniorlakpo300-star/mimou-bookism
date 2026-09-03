@@ -65,8 +65,6 @@ export default async function handler(req, res) {
 
     if (purchaseError) throw purchaseError
 
-    // Le guichet CinetPay affichera les moyens activés sur ton service marchand,
-    // notamment MTN Money et Wave en Côte d’Ivoire.
     const response = await fetch('https://api-checkout.cinetpay.com/v2/payment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -86,7 +84,8 @@ export default async function handler(req, res) {
     })
 
     const result = await response.json()
-    if (!response.ok || result.code !== '201' || !result.data?.payment_url) {
+    const successCode = String(result.code) === '201'
+    if (!response.ok || !successCode || !result.data?.payment_url) {
       await supabaseAdmin.from('purchases').update({ status: 'FAILED' }).eq('transaction_id', transactionId)
       return json(res, 502, { error: result.message || 'Impossible de créer le paiement.' })
     }
