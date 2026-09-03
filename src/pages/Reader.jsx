@@ -23,10 +23,27 @@ export default function Reader() {
         supabase.from('comments').select('*').eq('book_id', id).order('created_at', { ascending: false })
       ])
 
-      if (bookError) setError(bookError.message)
-      else {
+      if (bookError) {
+        setError(bookError.message)
+      } else {
         setBook(bookData)
-        setPdfUrl(bookData?.file_url || bookData?.book_url || '')
+
+        // Les PDF sont stockés dans le bucket privé « books ».
+        // On crée une URL signée à partir de file_path.
+        const filePath = bookData?.file_path || `${bookData?.id || id}.pdf`
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('books')
+          .createSignedUrl(filePath, 60 * 60)
+
+        if (!signedError && signedData?.signedUrl) {
+          setPdfUrl(signedData.signedUrl)
+        } else if (bookData?.file_url || bookData?.book_url) {
+          // Compatibilité avec les anciens livres déjà enregistrés.
+          setPdfUrl(bookData.file_url || bookData.book_url)
+        } else {
+          setPdfUrl('')
+          if (signedError) console.error('PDF:', signedError)
+        }
       }
 
       if (commentError) console.error(commentError)
