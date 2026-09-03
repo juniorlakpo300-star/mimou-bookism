@@ -5,6 +5,7 @@ import { supabase } from '../supabase.js'
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+MANGA'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
+const MANGA_FIELDS = 'id,title,author,category,description,cover_url,file_path,file_url,book_url,is_free,price,created_at'
 
 function getFavorites() {
   try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
@@ -19,18 +20,22 @@ export default function Manga() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
+
     async function loadMangas() {
       const { data, error } = await supabase
         .from('books')
-        .select('*')
+        .select(MANGA_FIELDS)
         .ilike('category', 'Manga •%')
         .order('created_at', { ascending: false })
 
+      if (!active) return
       if (error) setError(error.message)
       else setMangas(data || [])
       setLoading(false)
     }
     loadMangas()
+    return () => { active = false }
   }, [])
 
   const genres = useMemo(() => {
@@ -108,11 +113,19 @@ export default function Manga() {
           </div>
         ) : (
           <section className="book-grid">
-            {filtered.map(manga => (
+            {filtered.map((manga, index) => (
               <article key={manga.id} className="book-card enhanced-book-card">
                 <Link to={`/read/${manga.id}`} className="book-card-link" onClick={() => rememberRead(manga)}>
                   <div className="cover-wrap">
-                    <img src={manga.cover_url || FALLBACK_COVER} alt={`Couverture de ${manga.title || 'manga'}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+                    <img
+                      src={manga.cover_url || FALLBACK_COVER}
+                      alt={`Couverture de ${manga.title || 'manga'}`}
+                      className="book-cover"
+                      loading={index < 4 ? 'eager' : 'lazy'}
+                      fetchPriority={index < 2 ? 'high' : 'auto'}
+                      decoding="async"
+                      onError={e => { e.currentTarget.src = FALLBACK_COVER }}
+                    />
                     <span className={`book-status ${manga.is_free ? 'free' : 'premium'}`}>{manga.is_free ? 'Gratuit' : 'Premium'}</span>
                   </div>
                   <div className="book-info">
