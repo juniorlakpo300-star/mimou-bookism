@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../supabase.js'
-import { useAuth } from '../AuthContext.jsx'
 
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 
 export default function Catalogue() {
-  const { user, signOut } = useAuth()
   const [books, setBooks] = useState([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('Toutes')
@@ -46,10 +44,6 @@ export default function Catalogue() {
     })
   }, [books, search, category])
 
-  async function handleLogout() {
-    await signOut()
-  }
-
   if (loading) return <div className="state">Chargement des livres...</div>
   if (error) return <div className="state error">Erreur : {error}</div>
 
@@ -58,23 +52,9 @@ export default function Catalogue() {
       <div className="container">
         <header className="header">
           <Link to="/" className="brand">MIMOU <span>BOOKISM</span></Link>
-
           <nav className="nav">
             <Link to="/catalogue" className="btn active">Catalogue</Link>
-
-            {user ? (
-              <>
-                <Link to="/ecrivain" className="btn">✍️ Espace écrivain</Link>
-                <Link to="/publier" className="btn primary">+ Publier</Link>
-                <span className="user-chip">👤 {user.email}</span>
-                <button onClick={handleLogout} className="btn">Déconnexion</button>
-              </>
-            ) : (
-              <>
-                <Link to="/connexion" className="btn">Connexion</Link>
-                <Link to="/inscription" className="btn primary">Créer un compte</Link>
-              </>
-            )}
+            <Link to="/admin" className="btn">🛠️ Administration</Link>
           </nav>
         </header>
 
@@ -83,15 +63,7 @@ export default function Catalogue() {
             <p className="eyebrow">BIBLIOTHÈQUE NUMÉRIQUE</p>
             <h1>Découvrez votre prochaine lecture.</h1>
             <p>Explorez, lisez et téléchargez gratuitement vos livres préférés sur MIMOU BOOKISM.</p>
-
-            {user && (
-              <div className="hero-actions">
-                <Link to="/publier" className="btn primary">+ Publier un livre</Link>
-                <Link to="/ecrivain" className="btn">Voir mes publications</Link>
-              </div>
-            )}
           </div>
-
           <div className="hero-card">
             <span>📚</span>
             <strong>{books.length}</strong>
@@ -106,7 +78,6 @@ export default function Catalogue() {
             placeholder="🔎 Rechercher un livre, un auteur..."
             aria-label="Rechercher"
           />
-
           <select value={category} onChange={e => setCategory(e.target.value)}>
             {categories.map(item => <option key={item}>{item}</option>)}
           </select>
@@ -138,9 +109,10 @@ export default function Catalogue() {
                     className="book-cover"
                     onError={e => { e.currentTarget.src = FALLBACK_COVER }}
                   />
-                  <span className="book-status free">Gratuit</span>
+                  <span className={`book-status ${book.is_free ? 'free' : 'premium'}`}>
+                    {book.is_free ? 'Gratuit' : 'Premium'}
+                  </span>
                 </div>
-
                 <div className="book-info">
                   <h2 className="book-title">{book.title || 'Sans titre'}</h2>
                   <p className="book-author">{book.author || 'Auteur inconnu'}</p>
