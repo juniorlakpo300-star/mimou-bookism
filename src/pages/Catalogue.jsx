@@ -5,6 +5,7 @@ import { supabase } from '../supabase.js'
 const FALLBACK_COVER = 'https://placehold.co/400x560/0f172a/94a3b8?text=MIMOU+BOOKISM'
 const FAVORITES_KEY = 'mimou_bookism_favorites'
 const LAST_READ_KEY = 'mimou_bookism_last_read'
+const BOOK_FIELDS = 'id,title,author,category,description,cover_url,file_path,file_url,book_url,is_free,price,created_at'
 
 function getFavorites() {
   try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
@@ -21,18 +22,22 @@ export default function Catalogue() {
   const [error, setError] = useState('')
 
   useEffect(() => {
+    let active = true
+
     async function fetchBooks() {
       const { data, error } = await supabase
         .from('books')
-        .select('*')
+        .select(BOOK_FIELDS)
         .order('created_at', { ascending: false })
 
+      if (!active) return
       if (error) setError(error.message)
       else setBooks((data || []).filter(book => !String(book.category || '').toLowerCase().startsWith('manga •')))
       setLoading(false)
     }
 
     fetchBooks()
+    return () => { active = false }
   }, [])
 
   useEffect(() => {
@@ -126,11 +131,19 @@ export default function Catalogue() {
           </div>
         ) : (
           <section className="book-grid">
-            {filteredBooks.map(book => (
+            {filteredBooks.map((book, index) => (
               <article key={book.id} className="book-card enhanced-book-card">
                 <Link to={`/read/${book.id}`} className="book-card-link" onClick={() => rememberRead(book)}>
                   <div className="cover-wrap">
-                    <img src={book.cover_url || FALLBACK_COVER} alt={`Couverture de ${book.title || 'livre'}`} className="book-cover" onError={e => { e.currentTarget.src = FALLBACK_COVER }} />
+                    <img
+                      src={book.cover_url || FALLBACK_COVER}
+                      alt={`Couverture de ${book.title || 'livre'}`}
+                      className="book-cover"
+                      loading={index < 4 ? 'eager' : 'lazy'}
+                      fetchPriority={index < 2 ? 'high' : 'auto'}
+                      decoding="async"
+                      onError={e => { e.currentTarget.src = FALLBACK_COVER }}
+                    />
                     <span className={`book-status ${book.is_free ? 'free' : 'premium'}`}>{book.is_free ? 'Gratuit' : 'Premium'}</span>
                   </div>
                   <div className="book-info">
